@@ -20,6 +20,7 @@ const API_URL = getApiUrl() + '/api';
 let currentScanner = null;
 let currentStream = null;
 let scannedBarcode = null;
+let quaggaInitialized = false; // Флаг для отслеживания инициализации Quagga через init()
 
 // Продажа товара
 function openSellModal() {
@@ -758,18 +759,16 @@ function stopScanner() {
   
   // Останавливаем Quagga только если он был инициализирован через Quagga.init()
   // decodeSingle() не требует инициализации, поэтому stop() может вызвать ошибку
-  try {
-    if (typeof Quagga !== 'undefined' && Quagga && typeof Quagga.stop === 'function') {
-      // Проверяем, был ли Quagga инициализирован через init()
-      // Если есть inputStream, значит был вызван init()
-      const hasInputStream = Quagga.inputStream && Quagga.inputStream.type;
-      if (hasInputStream) {
+  if (quaggaInitialized) {
+    try {
+      if (typeof Quagga !== 'undefined' && Quagga && typeof Quagga.stop === 'function') {
         Quagga.stop();
+        quaggaInitialized = false; // Сбрасываем флаг после остановки
       }
+    } catch (e) {
+      // Игнорируем ошибки при остановке
+      quaggaInitialized = false; // Сбрасываем флаг даже при ошибке
     }
-  } catch (e) {
-    // Игнорируем ошибки - это нормально, если Quagga не был инициализирован
-    // или используется только decodeSingle() без init()
   }
   
   // Очищаем скрытые video элементы
