@@ -338,23 +338,24 @@ function startScanner(videoId, onDetected) {
   }).then(async (stream) => {
     currentStream = stream;
     
-    // КРИТИЧЕСКИ ВАЖНО: Устанавливаем стили ПЕРЕД присвоением stream
-    video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+    // Убеждаемся что контейнер имеет размеры
+    const container = video.parentElement;
+    if (container) {
+      container.style.width = '100%';
+      container.style.height = '300px';
+      container.style.minHeight = '300px';
+      container.style.maxWidth = '400px';
+    }
     
     // ПРИОРИТЕТ #1: Показываем видео пользователю СРАЗУ
+    // Устанавливаем стили ПЕРЕД присвоением stream
+    video.style.cssText = 'width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important; position: relative !important;';
+    
     video.srcObject = stream;
     video.setAttribute('playsinline', 'true');
     video.setAttribute('autoplay', 'true');
     video.setAttribute('muted', 'true');
     video.setAttribute('webkit-playsinline', 'true');
-    
-    // Убеждаемся что контейнер имеет размеры
-    const container = video.parentElement;
-    if (container) {
-      container.style.minHeight = '300px';
-      container.style.height = 'auto';
-      container.style.aspectRatio = '4/3';
-    }
     
     // Запускаем видео
     try {
@@ -363,7 +364,11 @@ function startScanner(videoId, onDetected) {
         if (video.readyState >= 2) {
           resolve();
         } else {
-          video.onloadedmetadata = resolve;
+          const handler = () => {
+            video.removeEventListener('loadedmetadata', handler);
+            resolve();
+          };
+          video.addEventListener('loadedmetadata', handler);
         }
       });
       
@@ -371,39 +376,51 @@ function startScanner(videoId, onDetected) {
       
       console.log('✅ Видео запущено');
       console.log('✅ Stream tracks:', stream.getVideoTracks().length);
-      console.log('✅ Video размеры:', video.videoWidth, 'x', video.videoHeight);
-      console.log('✅ Element размеры:', video.offsetWidth, 'x', video.offsetHeight);
-      console.log('✅ Computed display:', window.getComputedStyle(video).display);
-      console.log('✅ Computed visibility:', window.getComputedStyle(video).visibility);
-      console.log('✅ Computed opacity:', window.getComputedStyle(video).opacity);
-      console.log('✅ Computed position:', window.getComputedStyle(video).position);
-      console.log('✅ Computed z-index:', window.getComputedStyle(video).zIndex);
+      console.log('✅ Video stream размеры:', video.videoWidth, 'x', video.videoHeight);
+      console.log('✅ Video element offset:', video.offsetWidth, 'x', video.offsetHeight);
+      console.log('✅ Video element client:', video.clientWidth, 'x', video.clientHeight);
+      
+      const rect = video.getBoundingClientRect();
+      console.log('✅ Video bounding rect:', rect.width, 'x', rect.height, 'at', rect.left, rect.top);
+      
+      const computed = window.getComputedStyle(video);
+      console.log('✅ Computed styles:');
+      console.log('   display:', computed.display);
+      console.log('   visibility:', computed.visibility);
+      console.log('   opacity:', computed.opacity);
+      console.log('   position:', computed.position);
+      console.log('   z-index:', computed.zIndex);
+      console.log('   width:', computed.width);
+      console.log('   height:', computed.height);
       
       // Скрываем индикатор загрузки
       if (loadingEl) {
         loadingEl.classList.remove('show');
       }
       
-      // Принудительно обновляем стили после play
-      setTimeout(() => {
-        video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+      // Если размеры нулевые - исправляем
+      if (rect.width === 0 || rect.height === 0 || video.offsetWidth === 0 || video.offsetHeight === 0) {
+        console.error('❌ Video имеет нулевые размеры! Исправляем...');
         
-        // Проверяем что видео действительно видно
-        const rect = video.getBoundingClientRect();
-        console.log('✅ Bounding rect:', rect.width, 'x', rect.height);
-        
-        if (rect.width === 0 || rect.height === 0) {
-          console.error('❌ Video имеет нулевые размеры! Исправляем...');
-          if (container) {
-            container.style.width = '100%';
-            container.style.height = '300px';
-            container.style.minHeight = '300px';
-          }
-          video.style.width = '100%';
-          video.style.height = '100%';
-          video.style.minHeight = '300px';
+        if (container) {
+          container.style.width = '100%';
+          container.style.height = '300px';
+          container.style.minHeight = '300px';
+          container.style.display = 'block';
         }
-      }, 200);
+        
+        video.style.width = '100%';
+        video.style.height = '300px';
+        video.style.minHeight = '300px';
+        video.style.display = 'block';
+        video.style.visibility = 'visible';
+        video.style.opacity = '1';
+        
+        // Принудительно перезапускаем
+        setTimeout(() => {
+          video.play().catch(console.error);
+        }, 100);
+      }
       
       // Пробуем использовать нативный BarcodeDetector API (если доступен)
       if ('BarcodeDetector' in window) {
@@ -435,29 +452,44 @@ function startScanner(videoId, onDetected) {
         loadingEl.classList.remove('show');
       }
       // Убеждаемся, что видео видно с правильными размерами
-      video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+      video.style.cssText = 'width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important; position: relative !important;';
+      
+      // Проверяем размеры
+      const rect = video.getBoundingClientRect();
+      console.log('✅ После loadedmetadata - bounding rect:', rect.width, 'x', rect.height);
     };
     
     video.onplaying = () => {
-      console.log('✅ Видео воспроизводится, размеры элемента:', video.offsetWidth, 'x', video.offsetHeight);
+      console.log('✅ Видео воспроизводится');
+      console.log('✅ Размеры элемента:', video.offsetWidth, 'x', video.offsetHeight);
+      console.log('✅ Client размеры:', video.clientWidth, 'x', video.clientHeight);
+      
       if (loadingEl) {
         loadingEl.classList.remove('show');
       }
+      
       // Еще раз убеждаемся что видео видно
-      video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+      video.style.cssText = 'width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important; position: relative !important;';
       
       // Дополнительная проверка через requestAnimationFrame
       requestAnimationFrame(() => {
         const rect = video.getBoundingClientRect();
-        console.log('✅ Video bounding rect:', rect.width, 'x', rect.height, 'at', rect.left, rect.top);
+        const computed = window.getComputedStyle(video);
+        console.log('✅ Video final check:');
+        console.log('   Bounding rect:', rect.width, 'x', rect.height);
+        console.log('   Computed width:', computed.width);
+        console.log('   Computed height:', computed.height);
+        console.log('   Video stream:', video.videoWidth, 'x', video.videoHeight);
+        
         if (rect.width === 0 || rect.height === 0) {
-          console.error('❌ Video имеет нулевые размеры!');
-          // Пробуем исправить
-          const container = video.parentElement;
+          console.error('❌ Video все еще имеет нулевые размеры!');
+          console.error('   Container:', container ? container.offsetWidth + 'x' + container.offsetHeight : 'не найден');
+          
+          // Радикальное исправление
           if (container) {
-            container.style.minHeight = '300px';
-            container.style.height = '300px';
+            container.style.cssText = 'width: 100% !important; max-width: 400px !important; height: 300px !important; min-height: 300px !important; background: #000 !important; border-radius: 10px !important; overflow: hidden !important; position: relative !important; display: block !important;';
           }
+          video.style.cssText = 'width: 100% !important; height: 300px !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important; position: relative !important;';
         }
       });
     };
