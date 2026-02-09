@@ -747,31 +747,29 @@ function startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, vide
 
 
 function stopScanner() {
+  // Отключаем обработчики событий Quagga
   try {
-    if (typeof Quagga !== 'undefined' && Quagga) {
-      // Сначала отключаем обработчики событий
-      try {
-        Quagga.offDetected();
-      } catch (e) {
-        // Игнорируем ошибки при отключении обработчиков
-      }
-      
-      // Проверяем, запущен ли Quagga, перед остановкой
-      // Quagga имеет внутреннее состояние, проверяем через try-catch
-      try {
-        // Пробуем остановить только если Quagga действительно запущен
-        // Проверяем наличие внутренних свойств Quagga
-        if (Quagga.stop && (Quagga._running || Quagga._initialized)) {
-          Quagga.stop();
-        }
-      } catch (e) {
-        // Если Quagga не запущен или уже остановлен, игнорируем ошибку
-        // Это нормально, если сканер не был запущен через Quagga
+    if (typeof Quagga !== 'undefined' && Quagga && typeof Quagga.offDetected === 'function') {
+      Quagga.offDetected();
+    }
+  } catch (e) {
+    // Игнорируем ошибки при отключении обработчиков
+  }
+  
+  // Останавливаем Quagga только если он был инициализирован через Quagga.init()
+  // decodeSingle() не требует инициализации, поэтому stop() может вызвать ошибку
+  try {
+    if (typeof Quagga !== 'undefined' && Quagga && typeof Quagga.stop === 'function') {
+      // Проверяем, был ли Quagga инициализирован через init()
+      // Если есть inputStream, значит был вызван init()
+      const hasInputStream = Quagga.inputStream && Quagga.inputStream.type;
+      if (hasInputStream) {
+        Quagga.stop();
       }
     }
   } catch (e) {
-    // Игнорируем ошибки при остановке Quagga, если он не был инициализирован
-    // Это может происходить, если используется нативный BarcodeDetector вместо Quagga
+    // Игнорируем ошибки - это нормально, если Quagga не был инициализирован
+    // или используется только decodeSingle() без init()
   }
   
   // Очищаем скрытые video элементы
