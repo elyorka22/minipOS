@@ -342,9 +342,23 @@ function startScanner(videoId, onDetected) {
     video.setAttribute('autoplay', 'true');
     video.setAttribute('muted', 'true');
     
+    // Показываем видео сразу
+    video.play().catch(err => {
+      console.log('Автоплей не сработал, но это нормально:', err);
+    });
+    
     // Ждем, пока видео загрузится
     video.onloadedmetadata = () => {
       console.log('Видео загружено, инициализируем Quagga...');
+      
+      // Скрываем индикатор загрузки когда видео готово
+      if (loadingEl) {
+        loadingEl.classList.remove('show');
+      }
+      
+      // Убеждаемся, что видео видно
+      video.style.display = 'block';
+      video.style.visibility = 'visible';
       
       // Теперь инициализируем Quagga с уже полученным stream
       Quagga.init({
@@ -361,10 +375,6 @@ function startScanner(videoId, onDetected) {
         numOfWorkers: isMobile ? 1 : 2,
         frequency: isMobile ? 5 : 10
       }, (err) => {
-        if (loadingEl) {
-          loadingEl.classList.remove('show');
-        }
-        
         if (err) {
           handleError(err, 'инициализации Quagga');
           // Останавливаем stream при ошибке
@@ -378,6 +388,15 @@ function startScanner(videoId, onDetected) {
         Quagga.start();
         currentScanner = videoId;
         console.log('Сканер запущен успешно');
+        
+        // Убеждаемся, что видео видно после запуска Quagga
+        setTimeout(() => {
+          video.style.display = 'block';
+          video.style.visibility = 'visible';
+          if (loadingEl) {
+            loadingEl.classList.remove('show');
+          }
+        }, 300);
       });
       
       Quagga.onDetected((result) => {
@@ -389,8 +408,19 @@ function startScanner(videoId, onDetected) {
     };
     
     video.onerror = (err) => {
+      console.error('Ошибка видео элемента:', err);
       handleError(err, 'видео');
     };
+    
+    // Дополнительная проверка: если видео не загрузилось за 3 секунды
+    setTimeout(() => {
+      if (!video.srcObject || !video.readyState) {
+        console.warn('Видео не загрузилось, но продолжаем...');
+        if (loadingEl) {
+          loadingEl.classList.remove('show');
+        }
+      }
+    }, 3000);
     
   }).catch((err) => {
     handleError(err, 'доступа к камере');
