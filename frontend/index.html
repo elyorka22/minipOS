@@ -456,6 +456,80 @@
         .catch(err => console.log('Ошибка регистрации Service Worker:', err));
     }
   </script>
+  
+  <!-- Панель логов для отладки -->
+  <div id="debugLogs"></div>
+  <button id="toggleLogs" onclick="toggleDebugLogs()">📋 Логи</button>
+  
+  <script>
+    // Перехватываем console.log для отображения на экране
+    const debugLogsEl = document.getElementById('debugLogs');
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    const originalInfo = console.info;
+    
+    let logsVisible = false;
+    const maxLogs = 50;
+    let logCount = 0;
+    
+    function addLogToScreen(message, type = 'info') {
+      if (!debugLogsEl) return;
+      
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      debugLogsEl.appendChild(entry);
+      
+      logCount++;
+      if (logCount > maxLogs) {
+        debugLogsEl.removeChild(debugLogsEl.firstChild);
+        logCount--;
+      }
+      
+      // Автопрокрутка вниз
+      debugLogsEl.scrollTop = debugLogsEl.scrollHeight;
+    }
+    
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      addLogToScreen(args.join(' '), 'info');
+    };
+    
+    console.error = function(...args) {
+      originalError.apply(console, args);
+      addLogToScreen(args.join(' '), 'error');
+    };
+    
+    console.warn = function(...args) {
+      originalWarn.apply(console, args);
+      addLogToScreen(args.join(' '), 'warning');
+    };
+    
+    console.info = function(...args) {
+      originalInfo.apply(console, args);
+      addLogToScreen(args.join(' '), 'info');
+    };
+    
+    function toggleDebugLogs() {
+      logsVisible = !logsVisible;
+      if (logsVisible) {
+        debugLogsEl.classList.add('show');
+        document.getElementById('toggleLogs').textContent = '❌ Закрыть';
+      } else {
+        debugLogsEl.classList.remove('show');
+        document.getElementById('toggleLogs').textContent = '📋 Логи';
+      }
+    }
+    
+    // Показываем логи автоматически при ошибках
+    window.addEventListener('error', (e) => {
+      addLogToScreen(`ОШИБКА: ${e.message}`, 'error');
+      if (!logsVisible) {
+        toggleDebugLogs();
+      }
+    });
+  </script>
 </body>
 </html>
 
