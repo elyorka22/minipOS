@@ -533,6 +533,16 @@ function stopScanner() {
     console.error('Ошибка при остановке Quagga:', e);
   }
   
+  // Очищаем скрытые video элементы
+  if (window.hiddenVideos) {
+    Object.values(window.hiddenVideos).forEach(video => {
+      if (video.parentNode) {
+        video.parentNode.removeChild(video);
+      }
+    });
+    window.hiddenVideos = {};
+  }
+  
   if (currentStream) {
     currentStream.getTracks().forEach(track => {
       track.stop();
