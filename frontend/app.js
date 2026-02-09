@@ -717,6 +717,7 @@ function startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, vide
       }
       
       Quagga.start();
+      quaggaInitialized = true; // Отмечаем что Quagga был инициализирован через init()
       currentScanner = videoId;
       console.log('✅ Quagga запущен на скрытом video');
       
