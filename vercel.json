@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "buildCommand": "npm install && node frontend/replace-env.js",
+  "buildCommand": "cd frontend && node replace-env.js $VITE_API_URL || echo 'No build needed'",
   "outputDirectory": "frontend",
-  "installCommand": "npm install",
+  "installCommand": "echo 'No install needed'",
   "root": "frontend",
   "framework": null,
+  "cleanUrls": true,
   "headers": [
     {
       "source": "/sw.js",
