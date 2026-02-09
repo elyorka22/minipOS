@@ -579,39 +579,6 @@ function startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, vide
   });
 }
 
-// Ручной ввод штрих-кода для приема товара
-function receiveByManualBarcode() {
-  const barcode = document.getElementById('receiveBarcodeManual').value.trim();
-  if (!barcode) {
-    showMessage('receiveMessage', 'Введите штрих-код', 'error');
-    return;
-  }
-  
-  scannedBarcode = barcode;
-  
-  fetch(`${API_URL}/products/barcode/${barcode}`)
-    .then(res => {
-      if (!res.ok) {
-        return res.json().then(err => Promise.reject(new Error(err.error || 'Товар не найден')));
-      }
-      return res.json();
-    })
-    .then(product => {
-      showMessage('receiveMessage', `Товар найден: ${product.name}`, 'success');
-      document.getElementById('receiveProductInfo').innerHTML = `
-        <div class="product-item">
-          <div class="product-name">${product.name}</div>
-          <div class="product-info">Штрих-код: ${product.barcode}</div>
-          <div class="quantity-badge">Текущий остаток: ${product.quantity}</div>
-        </div>
-      `;
-      document.getElementById('quantityInputGroup').style.display = 'block';
-      document.getElementById('receiveBarcodeManual').value = '';
-    })
-    .catch(err => {
-      showMessage('receiveMessage', err.message || 'Товар не найден. Сначала добавьте товар', 'error');
-    });
-}
 
 function stopScanner() {
   try {
