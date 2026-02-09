@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4CAF50">
+  <meta name="api-url" content="%VITE_API_URL%">
+  <title>Учет товаров</title>
+  <link rel="manifest" href="/manifest.json">
+  <script>
+    // Установка API URL из переменной окружения (для Vercel)
+    window.API_URL = '%VITE_API_URL%' || 'http://localhost:3000';
+  </script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 10px;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 10px;
+    }
+    
+    .header h1 {
+      font-size: 24px;
+      color: #333;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 25px;
+      margin-bottom: 15px;
+      font-size: 22px;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      transition: background 0.3s;
+    }
+    
+    .btn:active {
+      background: #45a049;
+    }
+    
+    .btn-secondary {
+      background: #2196F3;
+    }
+    
+    .btn-secondary:active {
+      background: #0b7dda;
+    }
+    
+    .btn-list {
+      background: #FF9800;
+    }
+    
+    .btn-list:active {
+      background: #e68900;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+    }
+    
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      font-size: 18px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+    }
+    
+    .scanner-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    
+    #scanner {
+      width: 100%;
+      border-radius: 10px;
+    }
+    
+    .scanner-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      height: 200px;
+      border: 3px solid #4CAF50;
+      border-radius: 10px;
+      pointer-events: none;
+    }
+    
+    .message {
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 5px;
+      text-align: center;
+      font-weight: bold;
+    }
+    
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .message.info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+    
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #f44336;
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    
+    .products-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .product-item {
+      padding: 15px;
+      margin-bottom: 10px;
+      background: white;
+      border-radius: 5px;
+      border-left: 4px solid #4CAF50;
+    }
+    
+    .product-name {
+      font-weight: bold;
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    
+    .product-info {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .quantity-badge {
+      display: inline-block;
+      padding: 5px 10px;
+      background: #4CAF50;
+      color: white;
+      border-radius: 15px;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+    
+    .quantity-badge.low {
+      background: #f44336;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Учет товаров</h1>
+    </div>
+    
+    <button class="btn" onclick="openSellModal()">ПРОДАЖА (СКАНИРОВАТЬ)</button>
+    <button class="btn btn-secondary" onclick="openReceiveModal()">ПРИНЯТЬ ТОВАР</button>
+    <button class="btn btn-list" onclick="openAddProductModal()">ДОБАВИТЬ ТОВАР</button>
+    <button class="btn btn-list" onclick="openProductsList()">СПИСОК ТОВАРОВ</button>
+  </div>
+  
+  <!-- Модальное окно продажи -->
+  <div id="sellModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeSellModal()">×</button>
+      <div class="modal-header">Продажа товара</div>
+      <div id="sellMessage"></div>
+      <div class="scanner-container">
+        <video id="scanner" autoplay playsinline></video>
+        <div class="scanner-overlay"></div>
+      </div>
+      <div id="sellProductInfo"></div>
+    </div>
+  </div>
+  
+  <!-- Модальное окно приема товара -->
+  <div id="receiveModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeReceiveModal()">×</button>
+      <div class="modal-header">Принять товар</div>
+      <div id="receiveMessage"></div>
+      <div class="scanner-container">
+        <video id="receiveScanner" autoplay playsinline></video>
+        <div class="scanner-overlay"></div>
+      </div>
+      <div id="receiveProductInfo"></div>
+      <div class="form-group" id="quantityInputGroup" style="display: none;">
+        <label>Количество:</label>
+        <input type="number" id="receiveQuantity" min="1" value="1">
+        <button class="btn" onclick="confirmReceive()" style="margin-top: 10px;">ПОДТВЕРДИТЬ</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Модальное окно добавления товара -->
+  <div id="addProductModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeAddProductModal()">×</button>
+      <div class="modal-header">Добавить товар</div>
+      <div id="addProductMessage"></div>
+      <div class="form-group">
+        <label>Название товара:</label>
+        <input type="text" id="productName" placeholder="Введите название">
+      </div>
+      <div class="form-group">
+        <label>Штрих-код:</label>
+        <input type="text" id="productBarcode" placeholder="Введите или отсканируйте">
+        <button class="btn btn-secondary" onclick="scanBarcodeForAdd()" style="margin-top: 10px;">СКАНИРОВАТЬ</button>
+      </div>
+      <div class="form-group">
+        <label>Количество:</label>
+        <input type="number" id="productQuantity" min="0" value="0">
+      </div>
+      <button class="btn" onclick="addProduct()">ДОБАВИТЬ НА СКЛАД</button>
+    </div>
+  </div>
+  
+  <!-- Модальное окно сканирования для добавления -->
+  <div id="scanBarcodeModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeScanBarcodeModal()">×</button>
+      <div class="modal-header">Сканирование штрих-кода</div>
+      <div class="scanner-container">
+        <video id="barcodeScanner" autoplay playsinline></video>
+        <div class="scanner-overlay"></div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Модальное окно списка товаров -->
+  <div id="productsListModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeProductsList()">×</button>
+      <div class="modal-header">Список товаров</div>
+      <div id="productsList" class="products-list"></div>
+    </div>
+  </div>
+  
+  <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+  <script src="/app.js"></script>
+  <script>
+    // Регистрация Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker зарегистрирован'))
+        .catch(err => console.log('Ошибка регистрации Service Worker:', err));
+    }
+  </script>
+</body>
+</html>
+
