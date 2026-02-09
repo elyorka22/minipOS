@@ -1,162 +1,212 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Инициализация базы данных
-const db = new sqlite3.Database('./products.db');
+// Путь к файлу данных
+const DATA_FILE = path.join(__dirname, 'data', 'products.json');
 
-// Создание таблицы товаров
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    barcode TEXT UNIQUE NOT NULL,
-    quantity INTEGER DEFAULT 0
-  )`);
-});
+// Создать директорию data если её нет
+const dataDir = path.dirname(DATA_FILE);
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
 
-// API: Получить все товары
+// Инициализация файла данных если его нет
+if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
+}
+
+// Чтение данных
+function readProducts() {
+    try {
+        const data = fs.readFileSync(DATA_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Ошибка чтения данных:', error);
+        return [];
+    }
+}
+
+// Запись данных
+function writeProducts(products) {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Ошибка записи данных:', error);
+        return false;
+    }
+}
+
+// API Routes
+
+// Получить все товары
 app.get('/api/products', (req, res) => {
-  db.all('SELECT * FROM products ORDER BY name', (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json(rows);
-  });
+    const products = readProducts();
+    res.json(products);
 });
 
-// API: Получить товар по штрих-коду
+// Получить товар по ID
+app.get('/api/products/:id', (req, res) => {
+    const products = readProducts();
+    const product = products.find(p => p.id === req.params.id);
+    
+    if (!product) {
+        return res.status(404).json({ error: 'Товар не найден' });
+    }
+    
+    res.json(product);
+});
+
+// Найти товар по штрих-коду
 app.get('/api/products/barcode/:barcode', (req, res) => {
-  const barcode = req.params.barcode;
-  db.get('SELECT * FROM products WHERE barcode = ?', [barcode], (err, row) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    if (!row) {
-      res.status(404).json({ error: 'Товар не найден' });
-      return;
-    }
-    res.json(row);
-  });
-});
-
-// API: Продажа товара (уменьшить количество на 1)
-app.post('/api/products/sell/:barcode', (req, res) => {
-  const barcode = req.params.barcode;
-  db.get('SELECT * FROM products WHERE barcode = ?', [barcode], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (!row) {
-      return res.status(404).json({ error: 'Товар не найден' });
-    }
-    if (row.quantity <= 0) {
-      return res.status(400).json({ error: 'Товар закончился на складе' });
+    const products = readProducts();
+    const product = products.find(p => p.barcode === req.params.barcode);
+    
+    if (!product) {
+        return res.status(404).json({ error: 'Товар не найден' });
     }
     
-    db.run('UPDATE products SET quantity = quantity - 1 WHERE barcode = ?', [barcode], function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      db.get('SELECT * FROM products WHERE barcode = ?', [barcode], (err, updatedRow) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json(updatedRow);
-      });
-    });
-  });
+    res.json(product);
 });
 
-// API: Добавить товар
+// Создать товар
 app.post('/api/products', (req, res) => {
-  const { name, barcode, quantity } = req.body;
-  
-  if (!name || !barcode) {
-    res.status(400).json({ error: 'Название и штрих-код обязательны' });
-    return;
-  }
-  
-  db.run(
-    'INSERT INTO products (name, barcode, quantity) VALUES (?, ?, ?)',
-    [name, barcode, quantity || 0],
-    function(err) {
-      if (err) {
-        if (err.message.includes('UNIQUE')) {
-          res.status(400).json({ error: 'Товар с таким штрих-кодом уже существует' });
-          return;
-        }
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      db.get('SELECT * FROM products WHERE id = ?', [this.lastID], (err, row) => {
-        if (err) {
-          res.status(500).json({ error: err.message });
-          return;
-        }
-        res.json(row);
-      });
-    }
-  );
-});
-
-// API: Принять товар (увеличить количество)
-app.post('/api/products/receive/:barcode', (req, res) => {
-  const { quantity } = req.body;
-  const barcode = req.params.barcode;
-  
-  if (!quantity || quantity <= 0) {
-    res.status(400).json({ error: 'Количество должно быть больше 0' });
-    return;
-  }
-  
-  db.get('SELECT * FROM products WHERE barcode = ?', [barcode], (err, row) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    if (!row) {
-      res.status(404).json({ error: 'Товар не найден. Сначала добавьте товар' });
-      return;
+    const { name, barcode, quantity } = req.body;
+    
+    if (!name || !barcode) {
+        return res.status(400).json({ error: 'Название и штрих-код обязательны' });
     }
     
-    db.run(
-      'UPDATE products SET quantity = quantity + ? WHERE barcode = ?',
-      [quantity, barcode],
-      function(err) {
-        if (err) {
-          res.status(500).json({ error: err.message });
-          return;
+    const products = readProducts();
+    
+    // Проверка на дубликат
+    if (products.find(p => p.barcode === barcode)) {
+        return res.status(400).json({ error: 'Товар с таким штрих-кодом уже существует' });
+    }
+    
+    const newProduct = {
+        id: Date.now().toString(),
+        name: name.trim(),
+        barcode: barcode.trim(),
+        quantity: parseInt(quantity) || 0
+    };
+    
+    products.push(newProduct);
+    
+    if (writeProducts(products)) {
+        res.status(201).json(newProduct);
+    } else {
+        res.status(500).json({ error: 'Ошибка сохранения товара' });
+    }
+});
+
+// Обновить товар
+app.put('/api/products/:id', (req, res) => {
+    const { name, barcode, quantity } = req.body;
+    const products = readProducts();
+    const productIndex = products.findIndex(p => p.id === req.params.id);
+    
+    if (productIndex === -1) {
+        return res.status(404).json({ error: 'Товар не найден' });
+    }
+    
+    // Проверка на дубликат штрих-кода (если изменился)
+    if (barcode && barcode !== products[productIndex].barcode) {
+        if (products.find(p => p.barcode === barcode && p.id !== req.params.id)) {
+            return res.status(400).json({ error: 'Товар с таким штрих-кодом уже существует' });
         }
-        db.get('SELECT * FROM products WHERE barcode = ?', [barcode], (err, updatedRow) => {
-          if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-          }
-          res.json(updatedRow);
-        });
-      }
-    );
-  });
+    }
+    
+    if (name) products[productIndex].name = name.trim();
+    if (barcode) products[productIndex].barcode = barcode.trim();
+    if (quantity !== undefined) products[productIndex].quantity = parseInt(quantity) || 0;
+    
+    if (writeProducts(products)) {
+        res.json(products[productIndex]);
+    } else {
+        res.status(500).json({ error: 'Ошибка сохранения товара' });
+    }
 });
 
-// Главная страница
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// Удалить товар
+app.delete('/api/products/:id', (req, res) => {
+    const products = readProducts();
+    const filteredProducts = products.filter(p => p.id !== req.params.id);
+    
+    if (products.length === filteredProducts.length) {
+        return res.status(404).json({ error: 'Товар не найден' });
+    }
+    
+    if (writeProducts(filteredProducts)) {
+        res.json({ message: 'Товар удален' });
+    } else {
+        res.status(500).json({ error: 'Ошибка удаления товара' });
+    }
 });
 
+// Продажа товара (уменьшить количество на 1)
+app.post('/api/products/:id/sell', (req, res) => {
+    const products = readProducts();
+    const productIndex = products.findIndex(p => p.id === req.params.id);
+    
+    if (productIndex === -1) {
+        return res.status(404).json({ error: 'Товар не найден' });
+    }
+    
+    if (products[productIndex].quantity <= 0) {
+        return res.status(400).json({ error: 'Товар закончился на складе' });
+    }
+    
+    products[productIndex].quantity -= 1;
+    
+    if (writeProducts(products)) {
+        res.json(products[productIndex]);
+    } else {
+        res.status(500).json({ error: 'Ошибка сохранения товара' });
+    }
+});
+
+// Прием товара (увеличить количество)
+app.post('/api/products/:id/receive', (req, res) => {
+    const { quantity } = req.body;
+    const products = readProducts();
+    const productIndex = products.findIndex(p => p.id === req.params.id);
+    
+    if (productIndex === -1) {
+        return res.status(404).json({ error: 'Товар не найден' });
+    }
+    
+    const addQuantity = parseInt(quantity) || 1;
+    if (addQuantity <= 0) {
+        return res.status(400).json({ error: 'Количество должно быть больше 0' });
+    }
+    
+    products[productIndex].quantity += addQuantity;
+    
+    if (writeProducts(products)) {
+        res.json(products[productIndex]);
+    } else {
+        res.status(500).json({ error: 'Ошибка сохранения товара' });
+    }
+});
+
+// Отдача статических файлов (для SPA)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Запуск сервера
 app.listen(PORT, () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
+    console.log(`Сервер запущен на порту ${PORT}`);
+    console.log(`Данные хранятся в: ${DATA_FILE}`);
 });
-

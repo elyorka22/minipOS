@@ -1,9 +1,0 @@
-{
-  "name": "elpos-frontend",
-  "version": "1.0.0",
-  "description": "Frontend для учета товаров",
-  "scripts": {
-    "build": "echo 'No build step needed'"
-  }
-}
-

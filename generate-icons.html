@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Генератор иконок PWA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .icon-preview {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid #333;
+            margin: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4a9eff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Генератор иконок для PWA</h1>
+    <p>Нажмите кнопку для генерации иконок. Затем правой кнопкой мыши на canvas → "Сохранить изображение как..."</p>
+    
+    <div class="icon-preview">
+        <h3>192x192</h3>
+        <canvas id="icon192" width="192" height="192"></canvas>
+        <br>
+        <button onclick="downloadIcon('icon192', 'icon-192.png')">Скачать</button>
+    </div>
+    
+    <div class="icon-preview">
+        <h3>512x512</h3>
+        <canvas id="icon512" width="512" height="512"></canvas>
+        <br>
+        <button onclick="downloadIcon('icon512', 'icon-512.png')">Скачать</button>
+    </div>
+
+    <script>
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // Фон
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Рамка
+            ctx.strokeStyle = '#4a9eff';
+            ctx.lineWidth = size * 0.05;
+            ctx.strokeRect(size * 0.1, size * 0.1, size * 0.8, size * 0.8);
+            
+            // Иконка коробки
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const boxSize = size * 0.4;
+            
+            ctx.fillStyle = '#4a9eff';
+            ctx.beginPath();
+            // Передняя грань
+            ctx.moveTo(centerX - boxSize * 0.3, centerY - boxSize * 0.2);
+            ctx.lineTo(centerX + boxSize * 0.3, centerY - boxSize * 0.2);
+            ctx.lineTo(centerX + boxSize * 0.3, centerY + boxSize * 0.3);
+            ctx.lineTo(centerX - boxSize * 0.3, centerY + boxSize * 0.3);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Верхняя грань
+            ctx.beginPath();
+            ctx.moveTo(centerX - boxSize * 0.3, centerY - boxSize * 0.2);
+            ctx.lineTo(centerX - boxSize * 0.1, centerY - boxSize * 0.4);
+            ctx.lineTo(centerX + boxSize * 0.5, centerY - boxSize * 0.4);
+            ctx.lineTo(centerX + boxSize * 0.3, centerY - boxSize * 0.2);
+            ctx.closePath();
+            ctx.fillStyle = '#5aaeff';
+            ctx.fill();
+            
+            // Боковая грань
+            ctx.beginPath();
+            ctx.moveTo(centerX + boxSize * 0.3, centerY - boxSize * 0.2);
+            ctx.lineTo(centerX + boxSize * 0.5, centerY - boxSize * 0.4);
+            ctx.lineTo(centerX + boxSize * 0.5, centerY + boxSize * 0.1);
+            ctx.lineTo(centerX + boxSize * 0.3, centerY + boxSize * 0.3);
+            ctx.closePath();
+            ctx.fillStyle = '#3a8eef';
+            ctx.fill();
+            
+            // Штрих-код на передней грани
+            ctx.fillStyle = '#1a1a1a';
+            const barWidth = boxSize * 0.05;
+            const barHeight = boxSize * 0.3;
+            const startX = centerX - boxSize * 0.2;
+            const startY = centerY + boxSize * 0.05;
+            
+            for (let i = 0; i < 8; i++) {
+                if (i % 2 === 0) {
+                    ctx.fillRect(startX + i * barWidth * 2, startY, barWidth, barHeight);
+                }
+            }
+        }
+        
+        function downloadIcon(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // Генерация иконок при загрузке
+        window.onload = function() {
+            drawIcon(document.getElementById('icon192'), 192);
+            drawIcon(document.getElementById('icon512'), 512);
+        };
+    </script>
+</body>
+</html>
+
