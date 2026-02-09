@@ -338,21 +338,46 @@ function startScanner(videoId, onDetected) {
   }).then(async (stream) => {
     currentStream = stream;
     
+    // КРИТИЧЕСКИ ВАЖНО: Устанавливаем стили ПЕРЕД присвоением stream
+    video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+    
     // ПРИОРИТЕТ #1: Показываем видео пользователю СРАЗУ
     video.srcObject = stream;
     video.setAttribute('playsinline', 'true');
     video.setAttribute('autoplay', 'true');
     video.setAttribute('muted', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
     
-    // КРИТИЧЕСКИ ВАЖНО: Устанавливаем стили ДО play()
-    video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+    // Убеждаемся что контейнер имеет размеры
+    const container = video.parentElement;
+    if (container) {
+      container.style.minHeight = '300px';
+      container.style.height = 'auto';
+      container.style.aspectRatio = '4/3';
+    }
     
     // Запускаем видео
     try {
+      // Ждем loadedmetadata перед play
+      await new Promise((resolve) => {
+        if (video.readyState >= 2) {
+          resolve();
+        } else {
+          video.onloadedmetadata = resolve;
+        }
+      });
+      
       await video.play();
-      console.log('✅ Видео запущено, размеры:', video.videoWidth, 'x', video.videoHeight);
-      console.log('✅ Video элемент размеры:', video.offsetWidth, 'x', video.offsetHeight);
-      console.log('✅ Video computed style:', window.getComputedStyle(video).display, window.getComputedStyle(video).visibility);
+      
+      console.log('✅ Видео запущено');
+      console.log('✅ Stream tracks:', stream.getVideoTracks().length);
+      console.log('✅ Video размеры:', video.videoWidth, 'x', video.videoHeight);
+      console.log('✅ Element размеры:', video.offsetWidth, 'x', video.offsetHeight);
+      console.log('✅ Computed display:', window.getComputedStyle(video).display);
+      console.log('✅ Computed visibility:', window.getComputedStyle(video).visibility);
+      console.log('✅ Computed opacity:', window.getComputedStyle(video).opacity);
+      console.log('✅ Computed position:', window.getComputedStyle(video).position);
+      console.log('✅ Computed z-index:', window.getComputedStyle(video).zIndex);
       
       // Скрываем индикатор загрузки
       if (loadingEl) {
@@ -361,9 +386,24 @@ function startScanner(videoId, onDetected) {
       
       // Принудительно обновляем стили после play
       setTimeout(() => {
-        video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
-        console.log('✅ Стили обновлены после play');
-      }, 100);
+        video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+        
+        // Проверяем что видео действительно видно
+        const rect = video.getBoundingClientRect();
+        console.log('✅ Bounding rect:', rect.width, 'x', rect.height);
+        
+        if (rect.width === 0 || rect.height === 0) {
+          console.error('❌ Video имеет нулевые размеры! Исправляем...');
+          if (container) {
+            container.style.width = '100%';
+            container.style.height = '300px';
+            container.style.minHeight = '300px';
+          }
+          video.style.width = '100%';
+          video.style.height = '100%';
+          video.style.minHeight = '300px';
+        }
+      }, 200);
       
       // Пробуем использовать нативный BarcodeDetector API (если доступен)
       if ('BarcodeDetector' in window) {
