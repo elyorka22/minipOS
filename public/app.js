@@ -20,7 +20,7 @@ const API_URL = getApiUrl() + '/api';
 let currentScanner = null;
 let currentStream = null;
 let scannedBarcode = null;
-let quaggaInitialized = false; // Флаг для отслеживания инициализации Quagga через init()
+let html5QrCode = null; // Экземпляр html5-qrcode сканера
 
 // Продажа товара
 function openSellModal() {
@@ -674,137 +674,68 @@ function startNativeBarcodeDetection(video, videoId, onDetected, messageId) {
   }
 }
 
-// Сканирование через canvas (video остается видимым)
-function startCanvasScanning(video, canvas, videoId, onDetected, messageId, videoConstraints, isMobile) {
-  const ctx = canvas.getContext('2d');
-  
-  // Настраиваем canvas
-  const updateCanvasSize = () => {
-    if (video.videoWidth && video.videoHeight) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+// Сканирование через html5-qrcode (лучше работает на мобильных, не блокирует видео)
+function startHtml5QrCodeScanning(videoId, onDetected, messageId, videoConstraints, isMobile) {
+  if (typeof Html5Qrcode === 'undefined') {
+    console.error('❌ Html5Qrcode не загружен');
+    // Fallback на нативный API
+    const video = document.getElementById(videoId);
+    if (video && 'BarcodeDetector' in window) {
+      startNativeBarcodeDetection(video, videoId, onDetected, messageId);
     }
-  };
-  
-  // Функция захвата кадра и сканирования
-  const scanFrame = () => {
-    if (currentScanner !== videoId || !video.videoWidth) return;
-    
-    try {
-      updateCanvasSize();
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Используем Quagga для сканирования canvas
-      Quagga.decodeSingle({
-        decoder: {
-          readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-        },
-        locate: true,
-        src: canvas.toDataURL('image/png')
-      }, (result) => {
-        if (result && result.codeResult) {
-          console.log('✅ Штрих-код найден через canvas:', result.codeResult.code);
-          stopScanner();
-          onDetected(result);
-          return;
-        }
-        
-        // Продолжаем сканирование
-        if (currentScanner === videoId) {
-          setTimeout(scanFrame, isMobile ? 500 : 200);
-        }
-      });
-    } catch (err) {
-      console.error('Ошибка сканирования:', err);
-      if (currentScanner === videoId) {
-        setTimeout(scanFrame, 1000);
-      }
-    }
-  };
-  
-  currentScanner = videoId;
-  
-  // Запускаем сканирование когда видео готово
-  const startScan = () => {
-    if (video.videoWidth && video.videoHeight) {
-      scanFrame();
-    } else {
-      setTimeout(startScan, 100);
-    }
-  };
-  
-  if (video.readyState >= 2) {
-    startScan();
-  } else {
-    video.addEventListener('loadedmetadata', startScan, { once: true });
+    return;
   }
-}
-
-// Quagga с отдельным скрытым video элементом (если canvas не работает)
-function startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, videoConstraints, isMobile) {
-  // Создаем скрытый video для Quagga
-  const hiddenVideo = document.createElement('video');
-  hiddenVideo.srcObject = stream.clone(); // Клонируем stream
-  hiddenVideo.setAttribute('playsinline', 'true');
-  hiddenVideo.setAttribute('autoplay', 'true');
-  hiddenVideo.setAttribute('muted', 'true');
-  hiddenVideo.style.cssText = 'position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; z-index: -1;';
-  document.body.appendChild(hiddenVideo);
   
-  hiddenVideo.play().then(() => {
-    Quagga.init({
-      inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: hiddenVideo,
-        constraints: videoConstraints
-      },
-      decoder: {
-        readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-      },
-      locate: true,
-      numOfWorkers: isMobile ? 1 : 2,
-      frequency: isMobile ? 3 : 10
-    }, (err) => {
-      if (err) {
-        console.warn('⚠️ Quagga не запустился:', err);
-        document.body.removeChild(hiddenVideo);
-        // Пробуем нативный API как последний вариант
-        const video = document.getElementById(videoId);
-        if (video && 'BarcodeDetector' in window) {
-          startNativeBarcodeDetection(video, videoId, onDetected, messageId);
-        }
-        return;
-      }
-      
-      Quagga.start();
-      quaggaInitialized = true; // Отмечаем что Quagga был инициализирован через init()
-      currentScanner = videoId;
-      console.log('✅ Quagga запущен на скрытом video');
-      
-      // Сохраняем ссылку для очистки
-      window.hiddenVideos = window.hiddenVideos || {};
-      window.hiddenVideos[videoId] = hiddenVideo;
-      
-      // Сохраняем обработчик для последующего удаления
-      const detectionHandler = (result) => {
-        if (currentScanner === videoId && result && result.codeResult) {
-          // Отключаем обработчик перед остановкой
-          try {
-            Quagga.offDetected(detectionHandler);
-          } catch (e) {
-            // Игнорируем ошибки
-          }
-          stopScanner();
-          onDetected(result);
-        }
-      };
-      
-      Quagga.onDetected(detectionHandler);
-    });
-  }).catch(err => {
-    console.error('Ошибка скрытого video:', err);
-    document.body.removeChild(hiddenVideo);
+  const container = document.querySelector(`#${videoId}`).parentElement;
+  if (!container) {
+    console.error('❌ Контейнер не найден');
+    return;
+  }
+  
+  // Создаем экземпляр сканера
+  html5QrCode = new Html5Qrcode(videoId);
+  
+  const config = {
+    fps: isMobile ? 5 : 10,
+    qrbox: { width: 250, height: 250 },
+    aspectRatio: 1.0,
+    supportedScanTypes: [
+      Html5QrcodeScanType.SCAN_TYPE_CAMERA
+    ],
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.CODE_128
+    ]
+  };
+  
+  const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+    console.log('✅ Штрих-код найден:', decodedText);
+    stopScanner();
+    onDetected({ codeResult: { code: decodedText } });
+  };
+  
+  const qrCodeErrorCallback = (errorMessage) => {
+    // Игнорируем ошибки - это нормально при сканировании
+  };
+  
+  html5QrCode.start(
+    {
+      facingMode: videoConstraints.facingMode || "environment"
+    },
+    config,
+    qrCodeSuccessCallback,
+    qrCodeErrorCallback
+  ).then(() => {
+    currentScanner = videoId;
+    console.log('✅ Html5Qrcode сканер запущен');
+  }).catch((err) => {
+    console.error('❌ Ошибка запуска Html5Qrcode:', err);
+    // Fallback на нативный API
+    const video = document.getElementById(videoId);
+    if (video && 'BarcodeDetector' in window) {
+      startNativeBarcodeDetection(video, videoId, onDetected, messageId);
+    }
   });
 }
 
