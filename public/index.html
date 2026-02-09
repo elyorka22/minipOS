@@ -4,8 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#4CAF50">
+  <meta name="api-url" content="%VITE_API_URL%">
   <title>Учет товаров</title>
   <link rel="manifest" href="/manifest.json">
+  <script>
+    // Установка API URL из переменной окружения (для Vercel)
+    window.API_URL = '%VITE_API_URL%' || 'http://localhost:3000';
+  </script>
   <style>
     * {
       margin: 0;
@@ -221,6 +226,24 @@
     .quantity-badge.low {
       background: #f44336;
     }
+    
+    .scanner-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      font-weight: bold;
+      z-index: 10;
+      display: none;
+    }
+    
+    .scanner-loading.show {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -242,8 +265,9 @@
       <div class="modal-header">Продажа товара</div>
       <div id="sellMessage"></div>
       <div class="scanner-container">
-        <video id="scanner" autoplay playsinline></video>
+        <video id="scanner" autoplay playsinline muted></video>
         <div class="scanner-overlay"></div>
+        <div id="scannerLoading" class="scanner-loading">Загрузка камеры...</div>
       </div>
       <div id="sellProductInfo"></div>
     </div>
@@ -256,8 +280,9 @@
       <div class="modal-header">Принять товар</div>
       <div id="receiveMessage"></div>
       <div class="scanner-container">
-        <video id="receiveScanner" autoplay playsinline></video>
+        <video id="receiveScanner" autoplay playsinline muted></video>
         <div class="scanner-overlay"></div>
+        <div id="receiveScannerLoading" class="scanner-loading">Загрузка камеры...</div>
       </div>
       <div id="receiveProductInfo"></div>
       <div class="form-group" id="quantityInputGroup" style="display: none;">
@@ -297,8 +322,9 @@
       <button class="close-btn" onclick="closeScanBarcodeModal()">×</button>
       <div class="modal-header">Сканирование штрих-кода</div>
       <div class="scanner-container">
-        <video id="barcodeScanner" autoplay playsinline></video>
+        <video id="barcodeScanner" autoplay playsinline muted></video>
         <div class="scanner-overlay"></div>
+        <div id="barcodeScannerLoading" class="scanner-loading">Загрузка камеры...</div>
       </div>
     </div>
   </div>

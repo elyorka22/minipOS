@@ -26,7 +26,11 @@ function openSellModal() {
   document.getElementById('sellModal').classList.add('active');
   document.getElementById('sellMessage').innerHTML = '';
   document.getElementById('sellProductInfo').innerHTML = '';
-  startScanner('scanner', handleSellScan);
+  
+  // Небольшая задержка для отображения модального окна перед запуском камеры
+  setTimeout(() => {
+    startScanner('scanner', handleSellScan);
+  }, 100);
 }
 
 function closeSellModal() {
@@ -86,7 +90,11 @@ function openReceiveModal() {
   document.getElementById('receiveMessage').innerHTML = '';
   document.getElementById('receiveProductInfo').innerHTML = '';
   document.getElementById('quantityInputGroup').style.display = 'none';
-  startScanner('receiveScanner', handleReceiveScan);
+  
+  // Небольшая задержка для отображения модального окна перед запуском камеры
+  setTimeout(() => {
+    startScanner('receiveScanner', handleReceiveScan);
+  }, 100);
 }
 
 function closeReceiveModal() {
@@ -173,7 +181,11 @@ function closeAddProductModal() {
 
 function scanBarcodeForAdd() {
   document.getElementById('scanBarcodeModal').classList.add('active');
-  startScanner('barcodeScanner', handleBarcodeScanForAdd);
+  
+  // Небольшая задержка для отображения модального окна перед запуском камеры
+  setTimeout(() => {
+    startScanner('barcodeScanner', handleBarcodeScanForAdd);
+  }, 100);
 }
 
 function closeScanBarcodeModal() {
@@ -257,46 +269,123 @@ function startScanner(videoId, onDetected) {
   stopScanner();
   
   const video = document.getElementById(videoId);
+  if (!video) {
+    console.error('Video element not found:', videoId);
+    return;
+  }
   
-  Quagga.init({
-    inputStream: {
-      name: "Live",
-      type: "LiveStream",
-      target: video,
-      constraints: {
-        width: 640,
-        height: 480,
-        facingMode: "environment"
+  // Определяем, какое сообщение показывать в зависимости от модального окна
+  let messageId = 'sellMessage';
+  if (videoId === 'receiveScanner') {
+    messageId = 'receiveMessage';
+  } else if (videoId === 'barcodeScanner') {
+    messageId = 'addProductMessage';
+  }
+  
+  // Проверяем поддержку getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showMessage(messageId, 'Камера не поддерживается в этом браузере', 'error');
+    return;
+  }
+  
+  // Показываем индикатор загрузки
+  const loadingId = videoId + 'Loading';
+  const loadingEl = document.getElementById(loadingId);
+  if (loadingEl) {
+    loadingEl.classList.add('show');
+  }
+  
+  // Сначала запрашиваем доступ к камере
+  navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: "environment",
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    }
+  }).then((stream) => {
+    currentStream = stream;
+    
+    // Скрываем индикатор загрузки
+    if (loadingEl) {
+      loadingEl.classList.remove('show');
+    }
+    
+    // Теперь инициализируем Quagga
+    Quagga.init({
+      inputStream: {
+        name: "Live",
+        type: "LiveStream",
+        target: video,
+        constraints: {
+          width: 640,
+          height: 480,
+          facingMode: "environment"
+        }
+      },
+      decoder: {
+        readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
+      },
+      locate: true
+    }, (err) => {
+      if (err) {
+        console.error('Ошибка инициализации сканера:', err);
+        if (loadingEl) {
+          loadingEl.classList.remove('show');
+        }
+        showMessage(messageId, 'Не удалось запустить сканер. Попробуйте еще раз.', 'error');
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+          currentStream = null;
+        }
+        return;
       }
-    },
-    decoder: {
-      readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-    },
-    locate: true
-  }, (err) => {
-    if (err) {
-      console.error('Ошибка инициализации сканера:', err);
-      showMessage('sellMessage', 'Не удалось запустить камеру. Проверьте разрешения.', 'error');
-      return;
+      Quagga.start();
+      currentScanner = videoId;
+      console.log('Сканер запущен успешно');
+    });
+    
+    Quagga.onDetected((result) => {
+      if (currentScanner === videoId) {
+        stopScanner();
+        onDetected(result);
+      }
+    });
+  }).catch((err) => {
+    console.error('Ошибка доступа к камере:', err);
+    
+    // Скрываем индикатор загрузки
+    if (loadingEl) {
+      loadingEl.classList.remove('show');
     }
-    Quagga.start();
-    currentScanner = videoId;
-  });
-  
-  Quagga.onDetected((result) => {
-    if (currentScanner === videoId) {
-      stopScanner();
-      onDetected(result);
+    
+    let errorMessage = 'Не удалось получить доступ к камере. ';
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      errorMessage += 'Разрешите доступ к камере в настройках браузера.';
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      errorMessage += 'Камера не найдена.';
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      errorMessage += 'Камера уже используется другим приложением.';
+    } else {
+      errorMessage += 'Проверьте настройки браузера.';
     }
+    showMessage(messageId, errorMessage, 'error');
   });
 }
 
 function stopScanner() {
-  if (Quagga) {
-    Quagga.stop();
+  try {
+    if (typeof Quagga !== 'undefined' && Quagga) {
+      Quagga.stop();
+      Quagga.offDetected();
+    }
+  } catch (e) {
+    console.error('Ошибка при остановке Quagga:', e);
   }
+  
   if (currentStream) {
-    currentStream.getTracks().forEach(track => track.stop());
+    currentStream.getTracks().forEach(track => {
+      track.stop();
+    });
     currentStream = null;
   }
   currentScanner = null;
