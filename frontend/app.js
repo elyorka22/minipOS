@@ -761,6 +761,10 @@ function stopScanner() {
   // Останавливаем Quagga только если он был инициализирован через Quagga.init()
   // decodeSingle() не требует инициализации, поэтому stop() может вызвать ошибку
   if (quaggaInitialized) {
+    // Временно отключаем перехват ошибок для этого блока
+    const originalError = console.error;
+    console.error = () => {}; // Подавляем вывод ошибок
+    
     try {
       if (typeof Quagga !== 'undefined' && Quagga && typeof Quagga.stop === 'function') {
         // Дополнительная проверка перед вызовом stop()
@@ -773,15 +777,16 @@ function stopScanner() {
         } catch (innerErr) {
           // Если даже проверка вызывает ошибку, просто не вызываем stop()
           // Это нормально, если Quagga не был полностью инициализирован
-          // НЕ логируем ошибку - она не критична
         }
         quaggaInitialized = false; // Сбрасываем флаг после остановки
       }
     } catch (e) {
       // Полностью подавляем ошибку - она не критична
       // Это может происходить, если Quagga был частично инициализирован
-      // НЕ логируем ошибку - она не критична и не влияет на работу приложения
       quaggaInitialized = false; // Сбрасываем флаг даже при ошибке
+    } finally {
+      // Восстанавливаем перехват ошибок
+      console.error = originalError;
     }
   }
   
