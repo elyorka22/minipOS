@@ -722,13 +722,22 @@ function startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, vide
       // Сохраняем ссылку для очистки
       window.hiddenVideos = window.hiddenVideos || {};
       window.hiddenVideos[videoId] = hiddenVideo;
-    });
-    
-    Quagga.onDetected((result) => {
-      if (currentScanner === videoId && result && result.codeResult) {
-        stopScanner();
-        onDetected(result);
-      }
+      
+      // Сохраняем обработчик для последующего удаления
+      const detectionHandler = (result) => {
+        if (currentScanner === videoId && result && result.codeResult) {
+          // Отключаем обработчик перед остановкой
+          try {
+            Quagga.offDetected(detectionHandler);
+          } catch (e) {
+            // Игнорируем ошибки
+          }
+          stopScanner();
+          onDetected(result);
+        }
+      };
+      
+      Quagga.onDetected(detectionHandler);
     });
   }).catch(err => {
     console.error('Ошибка скрытого video:', err);
