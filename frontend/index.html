@@ -132,6 +132,15 @@
         <div id="notification" class="notification hidden"></div>
     </div>
 
+    <script>
+        // Установка API URL из переменной окружения
+        window.API_URL = window.API_URL || (function() {
+            // В Railway переменная окружения будет доступна через process.env
+            // Для браузера используем data-атрибут или дефолтное значение
+            const metaApiUrl = document.querySelector('meta[name="api-url"]');
+            return metaApiUrl ? metaApiUrl.getAttribute('content') : '/api';
+        })();
+    </script>
     <script src="app.js"></script>
 </body>
 </html>

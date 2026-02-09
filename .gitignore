@@ -5,3 +5,10 @@ data/
 *.log
 .idea/
 .vscode/
+
+# Backend
+backend/node_modules/
+backend/data/
+
+# Frontend
+frontend/node_modules/

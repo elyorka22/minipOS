@@ -1,16 +1,15 @@
 {
-  "name": "elpos",
+  "name": "elpos-backend",
   "version": "1.0.0",
-  "description": "Учет товаров в продуктовом магазине",
+  "description": "Backend API для учета товаров",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "keywords": [
-    "inventory",
-    "barcode",
-    "pwa"
+    "api",
+    "express",
+    "inventory"
   ],
   "author": "",
   "license": "MIT",
