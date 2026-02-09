@@ -184,6 +184,65 @@
       mix-blend-mode: normal;
     }
     
+    /* Панель логов для отладки */
+    #debugLogs {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      max-height: 200px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #0f0;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-y: auto;
+      z-index: 10000;
+      display: none;
+      border: 2px solid #0f0;
+    }
+    
+    #debugLogs.show {
+      display: block;
+    }
+    
+    #debugLogs .log-entry {
+      margin: 2px 0;
+      word-break: break-all;
+    }
+    
+    #debugLogs .log-error {
+      color: #f00;
+    }
+    
+    #debugLogs .log-success {
+      color: #0f0;
+    }
+    
+    #debugLogs .log-warning {
+      color: #ff0;
+    }
+    
+    #debugLogs .log-info {
+      color: #0ff;
+    }
+    
+    #toggleLogs {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 50px;
+      cursor: pointer;
+      z-index: 10001;
+      font-size: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    
     .message {
       padding: 15px;
       margin: 10px 0;
