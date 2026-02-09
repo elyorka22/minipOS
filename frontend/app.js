@@ -475,22 +475,17 @@ function startScanner(videoId, onDetected) {
         }, 100);
       }
       
-      // Пробуем использовать нативный BarcodeDetector API (если доступен)
+      // ПРИОРИТЕТ: Используем нативный BarcodeDetector API (если доступен)
+      // Он не блокирует видео и работает напрямую с нашим video элементом
       if ('BarcodeDetector' in window) {
         console.log('✅ Используем нативный BarcodeDetector API');
         startNativeBarcodeDetection(video, videoId, onDetected, messageId);
       } else {
-        // Fallback: используем Quagga через canvas (video остается видимым)
-        console.log('⚠️ BarcodeDetector не доступен, используем Quagga через canvas');
+        // Fallback: используем html5-qrcode, но убеждаемся что видео видно
+        console.log('⚠️ BarcodeDetector не доступен, используем html5-qrcode');
         setTimeout(() => {
-          const canvas = document.getElementById(videoId + 'Canvas');
-          if (canvas) {
-            startCanvasScanning(video, canvas, videoId, onDetected, messageId, videoConstraints, isMobile);
-          } else {
-            // Если canvas нет, используем скрытый video для Quagga
-            startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, videoConstraints, isMobile);
-          }
-        }, 1000); // Даем время видео отобразиться
+          startHtml5QrCodeScanning(videoId, onDetected, messageId, videoConstraints, isMobile);
+        }, 500); // Даем время видео отобразиться
       }
       
     } catch (err) {
@@ -674,34 +669,32 @@ function startNativeBarcodeDetection(video, videoId, onDetected, messageId) {
   }
 }
 
-// Сканирование через html5-qrcode (лучше работает на мобильных, не блокирует видео)
+// Сканирование через html5-qrcode (fallback если BarcodeDetector недоступен)
+// ВАЖНО: html5-qrcode создает свой video элемент, поэтому мы используем его только как fallback
 function startHtml5QrCodeScanning(videoId, onDetected, messageId, videoConstraints, isMobile) {
   if (typeof Html5Qrcode === 'undefined') {
-    console.error('❌ Html5Qrcode не загружен, используем нативный API');
-    // Fallback на нативный API
-    const video = document.getElementById(videoId);
-    if (video && 'BarcodeDetector' in window) {
-      startNativeBarcodeDetection(video, videoId, onDetected, messageId);
-    } else {
-      // Если нативный API тоже недоступен, используем простой canvas подход
-      console.log('⚠️ Используем простой canvas подход');
-      const video = document.getElementById(videoId);
-      const canvas = document.getElementById(videoId + 'Canvas');
-      if (video && canvas) {
-        startSimpleCanvasScanning(video, canvas, videoId, onDetected, messageId, isMobile);
-      }
-    }
+    console.error('❌ Html5Qrcode не загружен');
+    showMessage(messageId, 'Сканирование не поддерживается в этом браузере', 'error');
     return;
   }
   
-  // html5-qrcode будет использовать наш video элемент напрямую
-  // Это должно решить проблему с черным экраном
+  // html5-qrcode создает свой video элемент внутри контейнера
+  // Нам нужно использовать контейнер, а не сам video элемент
+  const video = document.getElementById(videoId);
+  const container = video ? video.parentElement : null;
+  
+  if (!container) {
+    console.error('❌ Контейнер не найден');
+    return;
+  }
+  
+  // Создаем экземпляр сканера на контейнере
+  // html5-qrcode создаст свой video элемент внутри
   html5QrCode = new Html5Qrcode(videoId);
   
   const config = {
     fps: isMobile ? 5 : 10,
     qrbox: function(viewfinderWidth, viewfinderHeight) {
-      // Динамический размер области сканирования
       const minEdgePercentage = 0.7;
       const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
       const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
@@ -738,20 +731,15 @@ function startHtml5QrCodeScanning(videoId, onDetected, messageId, videoConstrain
     qrCodeErrorCallback
   ).then(() => {
     currentScanner = videoId;
-    console.log('✅ Html5Qrcode сканер запущен, видео должно быть видно');
+    console.log('✅ Html5Qrcode сканер запущен');
+    
+    // Скрываем наш video элемент, так как html5-qrcode создаст свой
+    if (video) {
+      video.style.display = 'none';
+    }
   }).catch((err) => {
     console.error('❌ Ошибка запуска Html5Qrcode:', err);
-    // Fallback на нативный API
-    const video = document.getElementById(videoId);
-    if (video && 'BarcodeDetector' in window) {
-      startNativeBarcodeDetection(video, videoId, onDetected, messageId);
-    } else {
-      // Простой canvas fallback
-      const canvas = document.getElementById(videoId + 'Canvas');
-      if (video && canvas) {
-        startSimpleCanvasScanning(video, canvas, videoId, onDetected, messageId, isMobile);
-      }
-    }
+    showMessage(messageId, 'Не удалось запустить сканер', 'error');
   });
 }
 
