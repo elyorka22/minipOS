@@ -740,27 +740,61 @@ function startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, vide
 function stopScanner() {
   try {
     if (typeof Quagga !== 'undefined' && Quagga) {
-      Quagga.stop();
-      Quagga.offDetected();
+      // Сначала отключаем обработчики событий
+      try {
+        Quagga.offDetected();
+      } catch (e) {
+        // Игнорируем ошибки при отключении обработчиков
+      }
+      
+      // Проверяем, запущен ли Quagga, перед остановкой
+      // Quagga имеет внутреннее состояние, проверяем через try-catch
+      try {
+        // Пробуем остановить только если Quagga действительно запущен
+        // Проверяем наличие внутренних свойств Quagga
+        if (Quagga.stop && (Quagga._running || Quagga._initialized)) {
+          Quagga.stop();
+        }
+      } catch (e) {
+        // Если Quagga не запущен или уже остановлен, игнорируем ошибку
+        // Это нормально, если сканер не был запущен через Quagga
+      }
     }
   } catch (e) {
-    console.error('Ошибка при остановке Quagga:', e);
+    // Игнорируем ошибки при остановке Quagga, если он не был инициализирован
+    // Это может происходить, если используется нативный BarcodeDetector вместо Quagga
   }
   
   // Очищаем скрытые video элементы
   if (window.hiddenVideos) {
     Object.values(window.hiddenVideos).forEach(video => {
-      if (video.parentNode) {
-        video.parentNode.removeChild(video);
+      try {
+        if (video && video.parentNode) {
+          video.parentNode.removeChild(video);
+        }
+        // Останавливаем stream скрытого video
+        if (video.srcObject) {
+          const stream = video.srcObject;
+          stream.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+      } catch (e) {
+        // Игнорируем ошибки при очистке
       }
     });
     window.hiddenVideos = {};
   }
   
   if (currentStream) {
-    currentStream.getTracks().forEach(track => {
-      track.stop();
-    });
+    try {
+      currentStream.getTracks().forEach(track => {
+        if (track && track.stop) {
+          track.stop();
+        }
+      });
+    } catch (e) {
+      // Игнорируем ошибки при остановке треков
+    }
     currentStream = null;
   }
   currentScanner = null;
