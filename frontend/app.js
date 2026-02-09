@@ -332,78 +332,46 @@ function startScanner(videoId, onDetected) {
     showMessage(messageId, errorMessage, 'error');
   };
   
-  // Простой и надежный подход: сначала показываем видео, потом Quagga
+  // НОВЫЙ ПОДХОД: Показываем видео БЕЗ Quagga сначала, используем нативный BarcodeDetector если доступен
   navigator.mediaDevices.getUserMedia({
     video: videoConstraints
-  }).then((stream) => {
+  }).then(async (stream) => {
     currentStream = stream;
     
-    // ПРИОРИТЕТ: Показываем видео пользователю СРАЗУ
+    // ПРИОРИТЕТ #1: Показываем видео пользователю СРАЗУ
     video.srcObject = stream;
     video.setAttribute('playsinline', 'true');
     video.setAttribute('autoplay', 'true');
     video.setAttribute('muted', 'true');
     
     // Явно устанавливаем стили для видимости
-    video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important;';
+    video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
     
     // Запускаем видео
-    const playPromise = video.play();
-    
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        console.log('✅ Видео запущено и должно быть видно');
-        
-        // Скрываем индикатор загрузки
-        if (loadingEl) {
-          loadingEl.classList.remove('show');
-        }
-        
-        // Ждем немного, чтобы видео точно отобразилось
+    try {
+      await video.play();
+      console.log('✅ Видео запущено и должно быть видно');
+      
+      // Скрываем индикатор загрузки
+      if (loadingEl) {
+        loadingEl.classList.remove('show');
+      }
+      
+      // Пробуем использовать нативный BarcodeDetector API (если доступен)
+      if ('BarcodeDetector' in window) {
+        console.log('✅ Используем нативный BarcodeDetector API');
+        startNativeBarcodeDetection(video, videoId, onDetected, messageId);
+      } else {
+        // Fallback: используем Quagga, но только после того как видео точно видно
+        console.log('⚠️ BarcodeDetector не доступен, используем Quagga');
         setTimeout(() => {
-          // Теперь инициализируем Quagga (он не должен мешать видео)
-          Quagga.init({
-            inputStream: {
-              name: "Live",
-              type: "LiveStream",
-              target: video,
-              constraints: videoConstraints
-            },
-            decoder: {
-              readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-            },
-            locate: true,
-            numOfWorkers: isMobile ? 1 : 2,
-            frequency: isMobile ? 3 : 10
-          }, (err) => {
-            if (err) {
-              console.warn('⚠️ Quagga не запустился, но видео работает:', err);
-              // Не показываем ошибку - видео уже работает
-              showMessage(messageId, 'Камера работает. Если сканирование не работает, введите штрих-код вручную.', 'info');
-              return;
-            }
-            
-            Quagga.start();
-            currentScanner = videoId;
-            console.log('✅ Quagga запущен');
-            
-            // Убеждаемся, что видео все еще видно
-            setTimeout(() => {
-              video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important;';
-            }, 100);
-          });
-          
-          Quagga.onDetected((result) => {
-            if (currentScanner === videoId && result && result.codeResult) {
-              stopScanner();
-              onDetected(result);
-            }
-          });
-        }, isMobile ? 1000 : 500); // Больше времени на мобильных
-      }).catch(err => {
-        console.error('❌ Ошибка воспроизведения видео:', err);
-        handleError(err, 'воспроизведения видео');
-      });
+          startQuaggaScanning(video, videoId, onDetected, messageId, videoConstraints, isMobile, loadingEl);
+        }, 2000); // Даем больше времени на мобильных
+      }
+      
+    } catch (err) {
+      console.error('❌ Ошибка воспроизведения видео:', err);
+      handleError(err, 'воспроизведения видео');
     }
     
     // Обработчики событий видео
@@ -413,7 +381,7 @@ function startScanner(videoId, onDetected) {
         loadingEl.classList.remove('show');
       }
       // Убеждаемся, что видео видно
-      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important;';
+      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
     };
     
     video.onplaying = () => {
@@ -421,6 +389,8 @@ function startScanner(videoId, onDetected) {
       if (loadingEl) {
         loadingEl.classList.remove('show');
       }
+      // Еще раз убеждаемся что видео видно
+      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
     };
     
     video.onerror = (err) => {
@@ -431,6 +401,126 @@ function startScanner(videoId, onDetected) {
   }).catch((err) => {
     handleError(err, 'доступа к камере');
   });
+}
+
+// Нативный BarcodeDetector API (работает на многих мобильных браузерах)
+function startNativeBarcodeDetection(video, videoId, onDetected, messageId) {
+  const barcodeDetector = new BarcodeDetector({
+    formats: ['ean_13', 'ean_8', 'code_128']
+  });
+  
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  const detectBarcode = async () => {
+    if (currentScanner !== videoId || !video.videoWidth) return;
+    
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      
+      const barcodes = await barcodeDetector.detect(canvas);
+      
+      if (barcodes.length > 0) {
+        const barcode = barcodes[0].rawValue;
+        console.log('✅ Штрих-код найден:', barcode);
+        stopScanner();
+        onDetected({ codeResult: { code: barcode } });
+        return;
+      }
+    } catch (err) {
+      console.error('Ошибка сканирования:', err);
+    }
+    
+    // Продолжаем сканирование
+    if (currentScanner === videoId) {
+      requestAnimationFrame(detectBarcode);
+    }
+  };
+  
+  currentScanner = videoId;
+  video.onloadedmetadata = () => {
+    detectBarcode();
+  };
+  
+  if (video.readyState >= 2) {
+    detectBarcode();
+  }
+}
+
+// Quagga как fallback
+function startQuaggaScanning(video, videoId, onDetected, messageId, videoConstraints, isMobile, loadingEl) {
+  Quagga.init({
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: video,
+      constraints: videoConstraints
+    },
+    decoder: {
+      readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
+    },
+    locate: true,
+    numOfWorkers: isMobile ? 1 : 2,
+    frequency: isMobile ? 3 : 10
+  }, (err) => {
+    if (err) {
+      console.warn('⚠️ Quagga не запустился:', err);
+      showMessage(messageId, 'Камера работает. Введите штрих-код вручную или используйте сканер.', 'info');
+      return;
+    }
+    
+    Quagga.start();
+    currentScanner = videoId;
+    console.log('✅ Quagga запущен');
+    
+    // Убеждаемся, что видео все еще видно
+    setTimeout(() => {
+      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
+    }, 100);
+  });
+  
+  Quagga.onDetected((result) => {
+    if (currentScanner === videoId && result && result.codeResult) {
+      stopScanner();
+      onDetected(result);
+    }
+  });
+}
+
+// Ручной ввод штрих-кода для приема товара
+function receiveByManualBarcode() {
+  const barcode = document.getElementById('receiveBarcodeManual').value.trim();
+  if (!barcode) {
+    showMessage('receiveMessage', 'Введите штрих-код', 'error');
+    return;
+  }
+  
+  scannedBarcode = barcode;
+  
+  fetch(`${API_URL}/products/barcode/${barcode}`)
+    .then(res => {
+      if (!res.ok) {
+        return res.json().then(err => Promise.reject(new Error(err.error || 'Товар не найден')));
+      }
+      return res.json();
+    })
+    .then(product => {
+      showMessage('receiveMessage', `Товар найден: ${product.name}`, 'success');
+      document.getElementById('receiveProductInfo').innerHTML = `
+        <div class="product-item">
+          <div class="product-name">${product.name}</div>
+          <div class="product-info">Штрих-код: ${product.barcode}</div>
+          <div class="quantity-badge">Текущий остаток: ${product.quantity}</div>
+        </div>
+      `;
+      document.getElementById('quantityInputGroup').style.display = 'block';
+      document.getElementById('receiveBarcodeManual').value = '';
+    })
+    .catch(err => {
+      showMessage('receiveMessage', err.message || 'Товар не найден. Сначала добавьте товар', 'error');
+    });
 }
 
 function stopScanner() {
