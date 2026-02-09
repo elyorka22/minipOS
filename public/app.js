@@ -761,10 +761,6 @@ function stopScanner() {
   // Останавливаем Quagga только если он был инициализирован через Quagga.init()
   // decodeSingle() не требует инициализации, поэтому stop() может вызвать ошибку
   if (quaggaInitialized) {
-    // Временно отключаем перехват ошибок для этого блока
-    const originalError = console.error;
-    console.error = () => {}; // Подавляем вывод ошибок
-    
     try {
       if (typeof Quagga !== 'undefined' && Quagga && typeof Quagga.stop === 'function') {
         // Дополнительная проверка перед вызовом stop()
@@ -772,7 +768,27 @@ function stopScanner() {
         try {
           // Пробуем безопасно проверить состояние
           if (Quagga.inputStream && Quagga.inputStream.type) {
-            Quagga.stop();
+            // Используем window.onerror для перехвата ошибок Quagga
+            const originalOnerror = window.onerror;
+            window.onerror = function(msg, url, line, col, error) {
+              // Игнорируем ошибки Quagga при остановке
+              if (msg && msg.includes('Cannot read properties of undefined') && 
+                  msg.includes('type')) {
+                return true; // Подавляем ошибку
+              }
+              // Для других ошибок вызываем оригинальный обработчик
+              if (originalOnerror) {
+                return originalOnerror.apply(this, arguments);
+              }
+              return false;
+            };
+            
+            try {
+              Quagga.stop();
+            } finally {
+              // Восстанавливаем обработчик ошибок
+              window.onerror = originalOnerror;
+            }
           }
         } catch (innerErr) {
           // Если даже проверка вызывает ошибку, просто не вызываем stop()
@@ -784,9 +800,6 @@ function stopScanner() {
       // Полностью подавляем ошибку - она не критична
       // Это может происходить, если Quagga был частично инициализирован
       quaggaInitialized = false; // Сбрасываем флаг даже при ошибке
-    } finally {
-      // Восстанавливаем перехват ошибок
-      console.error = originalError;
     }
   }
   

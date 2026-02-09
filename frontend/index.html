@@ -520,7 +520,17 @@
     
     console.error = function(...args) {
       originalError.apply(console, args);
-      addLogToScreen(args.join(' '), 'error');
+      
+      // Игнорируем некритичные ошибки Quagga при остановке
+      const errorMessage = args.join(' ');
+      if (errorMessage.includes('Cannot read properties of undefined') && 
+          errorMessage.includes('type') &&
+          (errorMessage.includes('Quagga') || errorMessage.includes('quagga'))) {
+        // Не логируем эту некритичную ошибку
+        return;
+      }
+      
+      addLogToScreen(errorMessage, 'error');
     };
     
     console.warn = function(...args) {
