@@ -344,18 +344,26 @@ function startScanner(videoId, onDetected) {
     video.setAttribute('autoplay', 'true');
     video.setAttribute('muted', 'true');
     
-    // Явно устанавливаем стили для видимости
-    video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
+    // КРИТИЧЕСКИ ВАЖНО: Устанавливаем стили ДО play()
+    video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
     
     // Запускаем видео
     try {
       await video.play();
-      console.log('✅ Видео запущено и должно быть видно');
+      console.log('✅ Видео запущено, размеры:', video.videoWidth, 'x', video.videoHeight);
+      console.log('✅ Video элемент размеры:', video.offsetWidth, 'x', video.offsetHeight);
+      console.log('✅ Video computed style:', window.getComputedStyle(video).display, window.getComputedStyle(video).visibility);
       
       // Скрываем индикатор загрузки
       if (loadingEl) {
         loadingEl.classList.remove('show');
       }
+      
+      // Принудительно обновляем стили после play
+      setTimeout(() => {
+        video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+        console.log('✅ Стили обновлены после play');
+      }, 100);
       
       // Пробуем использовать нативный BarcodeDetector API (если доступен)
       if ('BarcodeDetector' in window) {
@@ -382,21 +390,36 @@ function startScanner(videoId, onDetected) {
     
     // Обработчики событий видео
     video.onloadedmetadata = () => {
-      console.log('✅ Метаданные видео загружены');
+      console.log('✅ Метаданные видео загружены:', video.videoWidth, 'x', video.videoHeight);
       if (loadingEl) {
         loadingEl.classList.remove('show');
       }
-      // Убеждаемся, что видео видно
-      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
+      // Убеждаемся, что видео видно с правильными размерами
+      video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
     };
     
     video.onplaying = () => {
-      console.log('✅ Видео воспроизводится');
+      console.log('✅ Видео воспроизводится, размеры элемента:', video.offsetWidth, 'x', video.offsetHeight);
       if (loadingEl) {
         loadingEl.classList.remove('show');
       }
       // Еще раз убеждаемся что видео видно
-      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
+      video.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; visibility: visible !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important;';
+      
+      // Дополнительная проверка через requestAnimationFrame
+      requestAnimationFrame(() => {
+        const rect = video.getBoundingClientRect();
+        console.log('✅ Video bounding rect:', rect.width, 'x', rect.height, 'at', rect.left, rect.top);
+        if (rect.width === 0 || rect.height === 0) {
+          console.error('❌ Video имеет нулевые размеры!');
+          // Пробуем исправить
+          const container = video.parentElement;
+          if (container) {
+            container.style.minHeight = '300px';
+            container.style.height = '300px';
+          }
+        }
+      });
     };
     
     video.onerror = (err) => {
