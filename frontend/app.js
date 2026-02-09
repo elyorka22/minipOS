@@ -427,6 +427,25 @@ function startScanner(videoId, onDetected) {
       console.log('   width:', computed.width);
       console.log('   height:', computed.height);
       
+      // КРИТИЧЕСКАЯ ПРОВЕРКА: Проверяем, что видео действительно воспроизводится
+      console.log('✅ Video состояние:');
+      console.log('   paused:', video.paused);
+      console.log('   ended:', video.ended);
+      console.log('   readyState:', video.readyState, '(0=nothing, 1=metadata, 2=current, 3=future, 4=enough)');
+      console.log('   currentTime:', video.currentTime);
+      console.log('   srcObject:', video.srcObject ? 'есть' : 'нет');
+      
+      // Проверяем треки stream
+      const videoTracks = stream.getVideoTracks();
+      if (videoTracks.length > 0) {
+        const track = videoTracks[0];
+        const settings = track.getSettings();
+        console.log('✅ Video track settings:', settings);
+        console.log('   enabled:', track.enabled);
+        console.log('   muted:', track.muted);
+        console.log('   readyState:', track.readyState);
+      }
+      
       // Скрываем индикатор загрузки
       if (loadingEl) {
         loadingEl.classList.remove('show');
@@ -491,12 +510,23 @@ function startScanner(videoId, onDetected) {
       // Проверяем размеры
       const rect = video.getBoundingClientRect();
       console.log('✅ После loadedmetadata - bounding rect:', rect.width, 'x', rect.height);
+      
+      // КРИТИЧНО: Принудительно запускаем воспроизведение если оно не началось
+      if (video.paused) {
+        console.log('⚠️ Видео на паузе после loadedmetadata, запускаем...');
+        video.play().then(() => {
+          console.log('✅ Видео запущено после play()');
+        }).catch(err => {
+          console.error('❌ Ошибка при play():', err);
+        });
+      }
     };
     
     video.onplaying = () => {
       console.log('✅ Видео воспроизводится');
       console.log('✅ Размеры элемента:', video.offsetWidth, 'x', video.offsetHeight);
       console.log('✅ Client размеры:', video.clientWidth, 'x', video.clientHeight);
+      console.log('✅ Video stream размеры:', video.videoWidth, 'x', video.videoHeight);
       
       if (loadingEl) {
         loadingEl.classList.remove('show');
@@ -504,6 +534,28 @@ function startScanner(videoId, onDetected) {
       
       // Еще раз убеждаемся что видео видно
       video.style.cssText = 'width: 100% !important; height: 100% !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important; position: relative !important;';
+      
+      // КРИТИЧНО: Проверяем, что видео действительно показывает кадры
+      // Если videoWidth и videoHeight есть, но экран черный - проблема в отображении
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        console.log('✅ Stream активен, размеры:', video.videoWidth, 'x', video.videoHeight);
+        
+        // Пробуем нарисовать кадр на canvas для проверки
+        const testCanvas = document.createElement('canvas');
+        testCanvas.width = video.videoWidth;
+        testCanvas.height = video.videoHeight;
+        const ctx = testCanvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        const imageData = ctx.getImageData(0, 0, 10, 10);
+        const hasData = imageData.data.some(pixel => pixel !== 0);
+        console.log('✅ Canvas test - есть данные:', hasData);
+        
+        if (!hasData) {
+          console.error('❌ ВИДЕО НЕ ПЕРЕДАЕТ ДАННЫЕ! Stream активен, но кадры пустые!');
+        }
+      } else {
+        console.error('❌ Video stream не имеет размеров!');
+      }
       
       // Дополнительная проверка через requestAnimationFrame
       requestAnimationFrame(() => {
@@ -514,6 +566,8 @@ function startScanner(videoId, onDetected) {
         console.log('   Computed width:', computed.width);
         console.log('   Computed height:', computed.height);
         console.log('   Video stream:', video.videoWidth, 'x', video.videoHeight);
+        console.log('   Paused:', video.paused);
+        console.log('   CurrentTime:', video.currentTime);
         
         if (rect.width === 0 || rect.height === 0) {
           console.error('❌ Video все еще имеет нулевые размеры!');
@@ -526,6 +580,13 @@ function startScanner(videoId, onDetected) {
           video.style.cssText = 'width: 100% !important; height: 300px !important; min-height: 300px !important; object-fit: cover !important; display: block !important; visibility: visible !important; opacity: 1 !important; background: #000 !important; z-index: 2 !important; border-radius: 10px !important; position: relative !important;';
         }
       });
+    };
+    
+    video.oncanplay = () => {
+      console.log('✅ Видео готово к воспроизведению');
+      if (video.paused) {
+        video.play().catch(err => console.error('Ошибка play() в oncanplay:', err));
+      }
     };
     
     video.onerror = (err) => {
