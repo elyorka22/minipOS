@@ -499,6 +499,35 @@ function startScanner(videoId, onDetected) {
       handleError(err, 'видео');
     };
     
+    // Дополнительная диагностика через 2 секунды
+    setTimeout(() => {
+      const rect = video.getBoundingClientRect();
+      const isVisible = rect.width > 0 && rect.height > 0;
+      const hasStream = video.srcObject !== null;
+      const isPlaying = !video.paused && !video.ended && video.readyState > 2;
+      
+      console.log('🔍 Диагностика через 2 секунды:');
+      console.log('   Видимый:', isVisible, `(${rect.width}x${rect.height})`);
+      console.log('   Имеет stream:', hasStream);
+      console.log('   Воспроизводится:', isPlaying, '(paused:', video.paused, ', ended:', video.ended, ')');
+      console.log('   ReadyState:', video.readyState, '(0=nothing, 1=metadata, 2=current, 3=future, 4=enough)');
+      console.log('   Video stream размеры:', video.videoWidth, 'x', video.videoHeight);
+      
+      if (hasStream && isPlaying && isVisible && video.videoWidth > 0) {
+        console.log('✅ Все параметры в порядке, но видео черное');
+        const tracks = stream.getVideoTracks();
+        if (tracks.length > 0) {
+          console.log('   Video track settings:', tracks[0].getSettings());
+        }
+      } else {
+        console.error('❌ Проблема:');
+        if (!hasStream) console.error('   - Нет stream в srcObject');
+        if (!isPlaying) console.error('   - Видео не воспроизводится');
+        if (!isVisible) console.error('   - Элемент не видимый');
+        if (video.videoWidth === 0) console.error('   - Stream не имеет размеров');
+      }
+    }, 2000);
+    
   }).catch((err) => {
     handleError(err, 'доступа к камере');
   });
