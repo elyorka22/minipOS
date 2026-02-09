@@ -243,6 +243,28 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     }
     
+    #copyLogs {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 11px;
+      z-index: 10002;
+    }
+    
+    #copyLogs:hover {
+      background: #1976D2;
+    }
+    
+    #copyLogs:active {
+      background: #0D47A1;
+    }
+    
     .message {
       padding: 15px;
       margin: 10px 0;
@@ -520,6 +542,81 @@
         debugLogsEl.classList.remove('show');
         document.getElementById('toggleLogs').textContent = '📋 Логи';
       }
+    }
+    
+    function copyLogsToClipboard() {
+      const logEntries = debugLogsEl.querySelectorAll('.log-entry');
+      let logsText = '=== ЛОГИ ПРИЛОЖЕНИЯ ===\n';
+      logsText += `Время: ${new Date().toLocaleString()}\n`;
+      logsText += `Всего записей: ${logEntries.length}\n\n`;
+      
+      logEntries.forEach((entry, index) => {
+        const type = entry.className.includes('error') ? 'ERROR' : 
+                     entry.className.includes('warning') ? 'WARN' : 
+                     entry.className.includes('success') ? 'SUCCESS' : 'INFO';
+        logsText += `${index + 1}. [${type}] ${entry.textContent}\n`;
+      });
+      
+      // Пробуем использовать современный Clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(logsText).then(() => {
+          showCopySuccess();
+        }).catch((err) => {
+          // Fallback для старых браузеров
+          fallbackCopyTextToClipboard(logsText);
+        });
+      } else {
+        // Fallback для старых браузеров
+        fallbackCopyTextToClipboard(logsText);
+      }
+    }
+    
+    function fallbackCopyTextToClipboard(text) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          showCopySuccess();
+        } else {
+          showCopyError();
+        }
+      } catch (err) {
+        showCopyError();
+      }
+      
+      document.body.removeChild(textArea);
+    }
+    
+    function showCopySuccess() {
+      const btn = document.getElementById('copyLogs');
+      const originalText = btn.textContent;
+      btn.textContent = '✅ Скопировано!';
+      btn.style.background = '#4CAF50';
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '#2196F3';
+      }, 2000);
+    }
+    
+    function showCopyError() {
+      const btn = document.getElementById('copyLogs');
+      const originalText = btn.textContent;
+      btn.textContent = '❌ Ошибка';
+      btn.style.background = '#f44336';
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '#2196F3';
+      }, 2000);
     }
     
     // Показываем логи автоматически при ошибках
