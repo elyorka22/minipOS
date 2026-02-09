@@ -295,80 +295,100 @@ function startScanner(videoId, onDetected) {
     loadingEl.classList.add('show');
   }
   
-  // Сначала запрашиваем доступ к камере
-  navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: "environment",
-      width: { ideal: 1280 },
-      height: { ideal: 720 }
-    }
-  }).then((stream) => {
-    currentStream = stream;
-    
-    // Скрываем индикатор загрузки
+  // Определяем, мобильное ли устройство
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Упрощенные constraints для мобильных устройств
+  const videoConstraints = isMobile ? {
+    facingMode: "environment"
+  } : {
+    facingMode: "environment",
+    width: { ideal: 1280 },
+    height: { ideal: 720 }
+  };
+  
+  // Функция для обработки ошибок
+  const handleError = (err, source) => {
     if (loadingEl) {
       loadingEl.classList.remove('show');
     }
     
-    // Теперь инициализируем Quagga
-    Quagga.init({
-      inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: video,
-        constraints: {
-          width: 640,
-          height: 480,
-          facingMode: "environment"
-        }
-      },
-      decoder: {
-        readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-      },
-      locate: true
-    }, (err) => {
-      if (err) {
-        console.error('Ошибка инициализации сканера:', err);
-        if (loadingEl) {
-          loadingEl.classList.remove('show');
-        }
-        showMessage(messageId, 'Не удалось запустить сканер. Попробуйте еще раз.', 'error');
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-          currentStream = null;
-        }
-        return;
-      }
-      Quagga.start();
-      currentScanner = videoId;
-      console.log('Сканер запущен успешно');
-    });
+    console.error(`Ошибка ${source}:`, err);
+    let errorMessage = 'Не удалось запустить камеру. ';
     
-    Quagga.onDetected((result) => {
-      if (currentScanner === videoId) {
-        stopScanner();
-        onDetected(result);
-      }
-    });
-  }).catch((err) => {
-    console.error('Ошибка доступа к камере:', err);
-    
-    // Скрываем индикатор загрузки
-    if (loadingEl) {
-      loadingEl.classList.remove('show');
-    }
-    
-    let errorMessage = 'Не удалось получить доступ к камере. ';
-    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+    if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || 
+        (err.message && err.message.includes('NotAllowedError')))) {
       errorMessage += 'Разрешите доступ к камере в настройках браузера.';
-    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+    } else if (err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError' ||
+        (err.message && err.message.includes('NotFoundError')))) {
       errorMessage += 'Камера не найдена.';
-    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+    } else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError' ||
+        (err.message && err.message.includes('NotReadableError')))) {
       errorMessage += 'Камера уже используется другим приложением.';
     } else {
-      errorMessage += 'Проверьте настройки браузера.';
+      errorMessage += 'Проверьте настройки браузера и попробуйте еще раз.';
     }
+    
     showMessage(messageId, errorMessage, 'error');
+  };
+  
+  // Инициализируем Quagga (он сам запросит доступ к камере)
+  Quagga.init({
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: video,
+      constraints: videoConstraints
+    },
+    decoder: {
+      readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
+    },
+    locate: true,
+    numOfWorkers: isMobile ? 1 : 2,
+    frequency: isMobile ? 5 : 10
+  }, (err) => {
+    if (err) {
+      handleError(err, 'инициализации Quagga');
+      return;
+    }
+    
+    // Получаем stream из Quagga для управления
+    try {
+      if (video.srcObject) {
+        currentStream = video.srcObject;
+      }
+    } catch (e) {
+      console.log('Не удалось получить stream:', e);
+    }
+    
+    Quagga.start();
+    currentScanner = videoId;
+    console.log('Сканер запущен успешно');
+    
+    // Скрываем индикатор загрузки после успешного запуска
+    setTimeout(() => {
+      if (loadingEl) {
+        loadingEl.classList.remove('show');
+      }
+    }, 500);
+  });
+  
+  Quagga.onDetected((result) => {
+    if (currentScanner === videoId && result && result.codeResult) {
+      stopScanner();
+      onDetected(result);
+    }
+  });
+  
+  // Обработка событий видео
+  video.addEventListener('loadedmetadata', () => {
+    if (loadingEl) {
+      loadingEl.classList.remove('show');
+    }
+  });
+  
+  video.addEventListener('error', (err) => {
+    handleError(err, 'видео');
   });
 }
 
