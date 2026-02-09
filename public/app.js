@@ -763,11 +763,22 @@ function stopScanner() {
   if (quaggaInitialized) {
     try {
       if (typeof Quagga !== 'undefined' && Quagga && typeof Quagga.stop === 'function') {
-        Quagga.stop();
+        // Дополнительная проверка перед вызовом stop()
+        // Проверяем наличие необходимых внутренних объектов Quagga
+        try {
+          // Пробуем безопасно проверить состояние
+          if (Quagga.inputStream) {
+            Quagga.stop();
+          }
+        } catch (innerErr) {
+          // Если даже проверка вызывает ошибку, просто не вызываем stop()
+          // Это нормально, если Quagga не был полностью инициализирован
+        }
         quaggaInitialized = false; // Сбрасываем флаг после остановки
       }
     } catch (e) {
-      // Игнорируем ошибки при остановке
+      // Полностью подавляем ошибку - она не критична
+      // Это может происходить, если Quagga был частично инициализирован
       quaggaInitialized = false; // Сбрасываем флаг даже при ошибке
     }
   }
