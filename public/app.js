@@ -357,6 +357,39 @@ function startScanner(videoId, onDetected) {
     video.setAttribute('muted', 'true');
     video.setAttribute('webkit-playsinline', 'true');
     
+    // ДЛЯ МОБИЛЬНЫХ: Пробуем также отобразить через canvas как fallback
+    if (isMobile) {
+      const canvas = document.getElementById(videoId + 'Canvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        canvas.style.cssText = 'position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; z-index: 1 !important; display: block !important;';
+        
+        const drawVideo = () => {
+          if (currentScanner === videoId && video.videoWidth > 0 && video.videoHeight > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Если video не видно, показываем canvas
+            const videoRect = video.getBoundingClientRect();
+            if (videoRect.width === 0 || videoRect.height === 0) {
+              canvas.style.display = 'block';
+              video.style.display = 'none';
+              console.log('⚠️ Video не видно, используем canvas для отображения');
+            }
+          }
+          
+          if (currentScanner === videoId) {
+            requestAnimationFrame(drawVideo);
+          }
+        };
+        
+        video.onloadedmetadata = () => {
+          drawVideo();
+        };
+      }
+    }
+    
     // Запускаем видео
     try {
       // Ждем loadedmetadata перед play
