@@ -332,34 +332,36 @@ function startScanner(videoId, onDetected) {
     showMessage(messageId, errorMessage, 'error');
   };
   
-  // Для мобильных устройств используем другой подход
-  if (isMobile) {
-    // На мобильных: сначала показываем видео, потом инициализируем Quagga отдельно
-    navigator.mediaDevices.getUserMedia({
-      video: videoConstraints
-    }).then((stream) => {
-      currentStream = stream;
-      video.srcObject = stream;
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('autoplay', 'true');
-      video.setAttribute('muted', 'true');
-      
-      // Показываем видео сразу
-      video.style.display = 'block';
-      video.style.visibility = 'visible';
-      video.style.width = '100%';
-      video.style.height = 'auto';
-      
-      video.play().then(() => {
-        console.log('Видео запущено');
+  // Простой и надежный подход: сначала показываем видео, потом Quagga
+  navigator.mediaDevices.getUserMedia({
+    video: videoConstraints
+  }).then((stream) => {
+    currentStream = stream;
+    
+    // ПРИОРИТЕТ: Показываем видео пользователю СРАЗУ
+    video.srcObject = stream;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('autoplay', 'true');
+    video.setAttribute('muted', 'true');
+    
+    // Явно устанавливаем стили для видимости
+    video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important;';
+    
+    // Запускаем видео
+    const playPromise = video.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        console.log('✅ Видео запущено и должно быть видно');
         
         // Скрываем индикатор загрузки
         if (loadingEl) {
           loadingEl.classList.remove('show');
         }
         
-        // Инициализируем Quagga с тем же stream, но через отдельный canvas
+        // Ждем немного, чтобы видео точно отобразилось
         setTimeout(() => {
+          // Теперь инициализируем Quagga (он не должен мешать видео)
           Quagga.init({
             inputStream: {
               name: "Live",
@@ -371,19 +373,24 @@ function startScanner(videoId, onDetected) {
               readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
             },
             locate: true,
-            numOfWorkers: 1,
-            frequency: 5
+            numOfWorkers: isMobile ? 1 : 2,
+            frequency: isMobile ? 3 : 10
           }, (err) => {
             if (err) {
-              console.error('Ошибка Quagga (но видео работает):', err);
-              // Не показываем ошибку, так как видео уже работает
-              // Пользователь может ввести штрих-код вручную
+              console.warn('⚠️ Quagga не запустился, но видео работает:', err);
+              // Не показываем ошибку - видео уже работает
+              showMessage(messageId, 'Камера работает. Если сканирование не работает, введите штрих-код вручную.', 'info');
               return;
             }
             
             Quagga.start();
             currentScanner = videoId;
-            console.log('Quagga запущен');
+            console.log('✅ Quagga запущен');
+            
+            // Убеждаемся, что видео все еще видно
+            setTimeout(() => {
+              video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important;';
+            }, 100);
           });
           
           Quagga.onDetected((result) => {
@@ -392,28 +399,39 @@ function startScanner(videoId, onDetected) {
               onDetected(result);
             }
           });
-        }, 500);
+        }, isMobile ? 1000 : 500); // Больше времени на мобильных
       }).catch(err => {
-        console.error('Ошибка воспроизведения видео:', err);
+        console.error('❌ Ошибка воспроизведения видео:', err);
         handleError(err, 'воспроизведения видео');
       });
-      
-      video.onloadedmetadata = () => {
-        console.log('Метаданные видео загружены');
-        if (loadingEl) {
-          loadingEl.classList.remove('show');
-        }
-      };
-      
-      video.onerror = (err) => {
-        console.error('Ошибка видео:', err);
-        handleError(err, 'видео');
-      };
-      
-    }).catch((err) => {
-      handleError(err, 'доступа к камере');
-    });
-  } else {
+    }
+    
+    // Обработчики событий видео
+    video.onloadedmetadata = () => {
+      console.log('✅ Метаданные видео загружены');
+      if (loadingEl) {
+        loadingEl.classList.remove('show');
+      }
+      // Убеждаемся, что видео видно
+      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important;';
+    };
+    
+    video.onplaying = () => {
+      console.log('✅ Видео воспроизводится');
+      if (loadingEl) {
+        loadingEl.classList.remove('show');
+      }
+    };
+    
+    video.onerror = (err) => {
+      console.error('❌ Ошибка видео:', err);
+      handleError(err, 'видео');
+    };
+    
+  }).catch((err) => {
+    handleError(err, 'доступа к камере');
+  });
+}
     // На десктопе: используем стандартный подход
     navigator.mediaDevices.getUserMedia({
       video: videoConstraints
