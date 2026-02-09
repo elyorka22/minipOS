@@ -1,19 +1,15 @@
 const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
-// CORS настройка - разрешаем запросы с фронтенда
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-app.use(cors({
-    origin: FRONTEND_URL,
-    credentials: true
-}));
-
+// Middleware
 app.use(express.json());
+
+// Статические файлы из public/
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Путь к файлу данных
 const DATA_FILE = path.join(__dirname, 'data', 'products.json');
@@ -206,12 +202,16 @@ app.post('/api/products/:id/receive', (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', service: 'backend' });
+    res.json({ status: 'ok' });
+});
+
+// SPA fallback - все остальные запросы на index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Запуск сервера
 app.listen(PORT, () => {
-    console.log(`Backend сервер запущен на порту ${PORT}`);
+    console.log(`Сервер запущен на порту ${PORT}`);
     console.log(`Данные хранятся в: ${DATA_FILE}`);
-    console.log(`CORS разрешен для: ${FRONTEND_URL}`);
 });

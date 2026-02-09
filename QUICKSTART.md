@@ -5,44 +5,24 @@
 ### 1. Установка зависимостей
 
 ```bash
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
 npm install
 ```
 
-### 2. Запуск Backend
+### 2. Запуск сервера
 
 ```bash
-cd backend
-npm start
-# Backend запустится на http://localhost:3001
-```
-
-### 3. Запуск Frontend
-
-В новом терминале:
-```bash
-cd frontend
-API_URL=http://localhost:3001 npm start
-# Frontend запустится на http://localhost:3000
-```
-
-Или установите переменную окружения:
-```bash
-export API_URL=http://localhost:3001
-cd frontend
 npm start
 ```
 
-### 4. Открыть в браузере
+Сервер запустится на `http://localhost:3000`
+
+### 3. Открыть в браузере
 
 ```
 http://localhost:3000
 ```
+
+Всё! Один сервер отдает и API, и фронтенд.
 
 ## Тестирование на Android
 

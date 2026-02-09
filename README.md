@@ -15,23 +15,19 @@
 
 ```
 elpos/
-├── backend/           # Backend сервис
-│   ├── server.js      # Backend сервер (Express API)
-│   ├── package.json   # Зависимости backend
-│   └── data/          # Данные (создается автоматически)
-│       └── products.json
-├── frontend/          # Frontend сервис
-│   ├── server.js      # Frontend сервер (статический)
-│   ├── package.json   # Зависимости frontend
+├── server.js          # Единый сервер (API + статика)
+├── package.json       # Зависимости
+├── railway.json       # Конфигурация Railway
+├── public/            # Frontend файлы
 │   ├── index.html     # Основная разметка
-│   ├── app.js         # Логика приложения (API клиент)
+│   ├── app.js         # Логика приложения
 │   ├── style.css      # Стили (темная тема)
 │   └── manifest.json  # PWA манифест
-├── railway.toml       # Конфигурация Railway
+├── data/              # Данные (создается автоматически)
+│   └── products.json
 ├── .gitignore         # Игнорируемые файлы
 ├── README.md          # Документация
-├── DEPLOY_RAILWAY.md  # Инструкции по деплою на Railway (два сервиса)
-├── DEPLOY.md          # Общие инструкции по деплою
+├── DEPLOY.md          # Инструкции по деплою
 └── QUICKSTART.md      # Быстрый старт
 ```
 
@@ -114,18 +110,15 @@ ipconfig
 
 ## Деплой на Railway
 
-Проект состоит из двух сервисов (frontend и backend), которые нужно деплоить отдельно.
-
-**Подробные инструкции в файле [DEPLOY_RAILWAY.md](./DEPLOY_RAILWAY.md)**
+**Подробные инструкции в файле [DEPLOY.md](./DEPLOY.md)**
 
 Кратко:
-1. Создайте два сервиса в Railway:
-   - Backend сервис (Root Directory: `backend`)
-   - Frontend сервис (Root Directory: `frontend`)
-2. Настройте переменные окружения:
-   - Backend: `FRONTEND_URL` = URL frontend сервиса
-   - Frontend: `API_URL` = URL backend сервиса
-3. Railway автоматически задеплоит оба сервиса
+1. Создайте репозиторий на GitHub
+2. Запушьте код
+3. В Railway выберите "Deploy from GitHub repo"
+4. Railway автоматически определит Node.js проект и задеплоит его
+
+Один сервис = простота деплоя, нет проблем с CORS, меньше настройки!
 
 ## Проверка работы камеры
 
@@ -213,7 +206,8 @@ function isTelegramWebView() {
 - Express.js сервер
 - RESTful API
 - Хранение данных в JSON файле
-- CORS настроен для работы с фронтендом
+- Отдает статические файлы из public/
+- Монолитная архитектура (один сервис)
 
 ## Дальнейшее развитие
 

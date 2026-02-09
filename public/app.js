@@ -10,9 +10,8 @@ let currentScanner = null;
 let currentBarcode = null;
 let currentProduct = null;
 
-// API базовый URL - используем переменную окружения или дефолтное значение
-const API_BASE = (window.API_URL || '/api').replace(/\/$/, '');
-console.log('API Base URL:', API_BASE);
+// API базовый URL - для монолита всегда /api
+const API_BASE = '/api';
 
 // API функции
 async function apiRequest(endpoint, options = {}) {
