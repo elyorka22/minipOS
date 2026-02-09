@@ -362,11 +362,17 @@ function startScanner(videoId, onDetected) {
         console.log('✅ Используем нативный BarcodeDetector API');
         startNativeBarcodeDetection(video, videoId, onDetected, messageId);
       } else {
-        // Fallback: используем Quagga, но только после того как видео точно видно
-        console.log('⚠️ BarcodeDetector не доступен, используем Quagga');
+        // Fallback: используем Quagga через canvas (video остается видимым)
+        console.log('⚠️ BarcodeDetector не доступен, используем Quagga через canvas');
         setTimeout(() => {
-          startQuaggaScanning(video, videoId, onDetected, messageId, videoConstraints, isMobile, loadingEl);
-        }, 2000); // Даем больше времени на мобильных
+          const canvas = document.getElementById(videoId + 'Canvas');
+          if (canvas) {
+            startCanvasScanning(video, canvas, videoId, onDetected, messageId, videoConstraints, isMobile);
+          } else {
+            // Если canvas нет, используем скрытый video для Quagga
+            startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, videoConstraints, isMobile);
+          }
+        }, 1000); // Даем время видео отобразиться
       }
       
     } catch (err) {
@@ -449,43 +455,127 @@ function startNativeBarcodeDetection(video, videoId, onDetected, messageId) {
   }
 }
 
-// Quagga как fallback
-function startQuaggaScanning(video, videoId, onDetected, messageId, videoConstraints, isMobile, loadingEl) {
-  Quagga.init({
-    inputStream: {
-      name: "Live",
-      type: "LiveStream",
-      target: video,
-      constraints: videoConstraints
-    },
-    decoder: {
-      readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-    },
-    locate: true,
-    numOfWorkers: isMobile ? 1 : 2,
-    frequency: isMobile ? 3 : 10
-  }, (err) => {
-    if (err) {
-      console.warn('⚠️ Quagga не запустился:', err);
-      showMessage(messageId, 'Камера работает. Введите штрих-код вручную или используйте сканер.', 'info');
-      return;
-    }
-    
-    Quagga.start();
-    currentScanner = videoId;
-    console.log('✅ Quagga запущен');
-    
-    // Убеждаемся, что видео все еще видно
-    setTimeout(() => {
-      video.style.cssText = 'display: block !important; visibility: visible !important; width: 100% !important; height: auto !important; object-fit: cover !important; background: #000 !important; z-index: 1 !important;';
-    }, 100);
-  });
+// Сканирование через canvas (video остается видимым)
+function startCanvasScanning(video, canvas, videoId, onDetected, messageId, videoConstraints, isMobile) {
+  const ctx = canvas.getContext('2d');
   
-  Quagga.onDetected((result) => {
-    if (currentScanner === videoId && result && result.codeResult) {
-      stopScanner();
-      onDetected(result);
+  // Настраиваем canvas
+  const updateCanvasSize = () => {
+    if (video.videoWidth && video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
     }
+  };
+  
+  // Функция захвата кадра и сканирования
+  const scanFrame = () => {
+    if (currentScanner !== videoId || !video.videoWidth) return;
+    
+    try {
+      updateCanvasSize();
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Используем Quagga для сканирования canvas
+      Quagga.decodeSingle({
+        decoder: {
+          readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
+        },
+        locate: true,
+        src: canvas.toDataURL('image/png')
+      }, (result) => {
+        if (result && result.codeResult) {
+          console.log('✅ Штрих-код найден через canvas:', result.codeResult.code);
+          stopScanner();
+          onDetected(result);
+          return;
+        }
+        
+        // Продолжаем сканирование
+        if (currentScanner === videoId) {
+          setTimeout(scanFrame, isMobile ? 500 : 200);
+        }
+      });
+    } catch (err) {
+      console.error('Ошибка сканирования:', err);
+      if (currentScanner === videoId) {
+        setTimeout(scanFrame, 1000);
+      }
+    }
+  };
+  
+  currentScanner = videoId;
+  
+  // Запускаем сканирование когда видео готово
+  const startScan = () => {
+    if (video.videoWidth && video.videoHeight) {
+      scanFrame();
+    } else {
+      setTimeout(startScan, 100);
+    }
+  };
+  
+  if (video.readyState >= 2) {
+    startScan();
+  } else {
+    video.addEventListener('loadedmetadata', startScan, { once: true });
+  }
+}
+
+// Quagga с отдельным скрытым video элементом (если canvas не работает)
+function startQuaggaWithHiddenVideo(stream, videoId, onDetected, messageId, videoConstraints, isMobile) {
+  // Создаем скрытый video для Quagga
+  const hiddenVideo = document.createElement('video');
+  hiddenVideo.srcObject = stream.clone(); // Клонируем stream
+  hiddenVideo.setAttribute('playsinline', 'true');
+  hiddenVideo.setAttribute('autoplay', 'true');
+  hiddenVideo.setAttribute('muted', 'true');
+  hiddenVideo.style.cssText = 'position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; z-index: -1;';
+  document.body.appendChild(hiddenVideo);
+  
+  hiddenVideo.play().then(() => {
+    Quagga.init({
+      inputStream: {
+        name: "Live",
+        type: "LiveStream",
+        target: hiddenVideo,
+        constraints: videoConstraints
+      },
+      decoder: {
+        readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
+      },
+      locate: true,
+      numOfWorkers: isMobile ? 1 : 2,
+      frequency: isMobile ? 3 : 10
+    }, (err) => {
+      if (err) {
+        console.warn('⚠️ Quagga не запустился:', err);
+        document.body.removeChild(hiddenVideo);
+        // Пробуем нативный API как последний вариант
+        const video = document.getElementById(videoId);
+        if (video && 'BarcodeDetector' in window) {
+          startNativeBarcodeDetection(video, videoId, onDetected, messageId);
+        }
+        return;
+      }
+      
+      Quagga.start();
+      currentScanner = videoId;
+      console.log('✅ Quagga запущен на скрытом video');
+      
+      // Сохраняем ссылку для очистки
+      window.hiddenVideos = window.hiddenVideos || {};
+      window.hiddenVideos[videoId] = hiddenVideo;
+    });
+    
+    Quagga.onDetected((result) => {
+      if (currentScanner === videoId && result && result.codeResult) {
+        stopScanner();
+        onDetected(result);
+      }
+    });
+  }).catch(err => {
+    console.error('Ошибка скрытого video:', err);
+    document.body.removeChild(hiddenVideo);
   });
 }
 
