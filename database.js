@@ -630,6 +630,20 @@ async function getOpenSessions() {
     }
 }
 
+// Получить все сессии (открытые и закрытые)
+async function getAllSessions() {
+    try {
+        const result = await pool.query(`
+            SELECT * FROM sessions 
+            ORDER BY session_number DESC
+        `);
+        return result.rows;
+    } catch (error) {
+        console.error('Ошибка получения всех сессий:', error);
+        throw error;
+    }
+}
+
 // Получить сессию по ID
 async function getSessionById(id) {
     try {

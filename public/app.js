@@ -1430,7 +1430,8 @@ async function createNewSession() {
 
 async function loadOpenSessions() {
     try {
-        const sessions = await apiRequest('/sessions/open');
+        // Загружаем все сессии, а не только открытые
+        const sessions = await apiRequest('/sessions');
         renderSessionsList(sessions);
         return sessions;
     } catch (error) {
@@ -1448,14 +1449,37 @@ function renderSessionsList(sessions) {
         return;
     }
     
-    listEl.innerHTML = sessions.map(session => `
-        <div class="session-item">
-            <button class="btn-session" data-session-id="${session.id}" data-session-number="${session.session_number}">
-                Сессия ${session.session_number}
-            </button>
-            <button class="btn-delete-session" data-session-id="${session.id}" data-session-number="${session.session_number}" title="Удалить сессию">🗑️</button>
-        </div>
-    `).join('');
+    // Разделяем на открытые и закрытые
+    const openSessions = sessions.filter(s => s.status === 'open');
+    const closedSessions = sessions.filter(s => s.status === 'closed');
+    
+    let html = '';
+    
+    // Показываем открытые сессии
+    if (openSessions.length > 0) {
+        html += openSessions.map(session => `
+            <div class="session-item">
+                <button class="btn-session" data-session-id="${session.id}" data-session-number="${session.session_number}">
+                    Сессия ${session.session_number} <span style="color: var(--success);">(открыта)</span>
+                </button>
+                <button class="btn-delete-session" data-session-id="${session.id}" data-session-number="${session.session_number}" title="Удалить сессию">🗑️</button>
+            </div>
+        `).join('');
+    }
+    
+    // Показываем закрытые сессии
+    if (closedSessions.length > 0) {
+        html += closedSessions.map(session => `
+            <div class="session-item" style="opacity: 0.6;">
+                <button class="btn-session" data-session-id="${session.id}" data-session-number="${session.session_number}" disabled style="cursor: not-allowed;">
+                    Сессия ${session.session_number} <span style="color: var(--text-secondary);">(закрыта)</span>
+                </button>
+                <button class="btn-delete-session" data-session-id="${session.id}" data-session-number="${session.session_number}" title="Удалить сессию">🗑️</button>
+            </div>
+        `).join('');
+    }
+    
+    listEl.innerHTML = html;
 }
 
 async function selectSession(sessionId) {

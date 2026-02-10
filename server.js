@@ -232,6 +232,20 @@ app.get('/api/sessions/open', async (req, res) => {
     }
 });
 
+// Получить все сессии (открытые и закрытые)
+app.get('/api/sessions', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const sessions = await db.getAllSessions();
+        res.json(sessions);
+    } catch (error) {
+        console.error('Ошибка получения всех сессий:', error);
+        res.status(500).json({ error: 'Ошибка получения всех сессий' });
+    }
+});
+
 app.get('/api/sessions/:id', async (req, res) => {
     try {
         if (!dbInitialized) {
