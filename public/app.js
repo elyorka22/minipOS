@@ -524,7 +524,7 @@ function switchView(viewName) {
 }
 
 // Добавить товар в корзину продажи
-function addToSaleCart(product) {
+async function addToSaleCart(product) {
     // Проверить, есть ли товар уже в корзине
     const existingItem = saleCart.find(item => item.id === product.id);
     
@@ -548,10 +548,24 @@ function addToSaleCart(product) {
         return;
     }
 
-    saleCart.push({
+    const newItem = {
         ...product,
         quantityInCart: 1
-    });
+    };
+    
+    saleCart.push(newItem);
+    
+    // Сохранить в БД если есть активная сессия
+    if (currentSessionId) {
+        try {
+            await apiRequest(`/sessions/${currentSessionId}/items`, {
+                method: 'POST',
+                body: JSON.stringify({ product, quantity: 1 })
+            });
+        } catch (error) {
+            console.error('Ошибка сохранения товара в сессию:', error);
+        }
+    }
     
     renderSaleCart();
     
@@ -566,8 +580,20 @@ function addToSaleCart(product) {
 }
 
 // Удалить товар из корзины
-function removeFromSaleCart(productId) {
+async function removeFromSaleCart(productId) {
     saleCart = saleCart.filter(item => item.id !== productId);
+    
+    // Удалить из БД если есть активная сессия
+    if (currentSessionId) {
+        try {
+            await apiRequest(`/sessions/${currentSessionId}/items/${productId}`, {
+                method: 'DELETE'
+            });
+        } catch (error) {
+            console.error('Ошибка удаления товара из сессии:', error);
+        }
+    }
+    
     renderSaleCart();
 }
 
@@ -589,7 +615,7 @@ async function updateCartItemQuantity(productId, change) {
     const newQuantity = item.quantityInCart + change;
     
     if (newQuantity <= 0) {
-        removeFromSaleCart(productId);
+        await removeFromSaleCart(productId);
         return;
     }
     
@@ -599,6 +625,19 @@ async function updateCartItemQuantity(productId, change) {
     }
     
     item.quantityInCart = newQuantity;
+    
+    // Обновить в БД если есть активная сессия
+    if (currentSessionId) {
+        try {
+            await apiRequest(`/sessions/${currentSessionId}/items/${productId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ quantity: newQuantity })
+            });
+        } catch (error) {
+            console.error('Ошибка обновления товара в сессии:', error);
+        }
+    }
+    
     renderSaleCart();
 }
 

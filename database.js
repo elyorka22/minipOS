@@ -100,6 +100,31 @@ async function initDatabase() {
         `);
         console.log('Таблица sessions создана/проверена');
 
+        // Создать таблицу товаров в корзине сессии
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS session_items (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL,
+                product_id VARCHAR(255) NOT NULL,
+                product_name VARCHAR(255) NOT NULL,
+                product_barcode VARCHAR(255) NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                price DECIMAL(10, 2) DEFAULT 0,
+                purchase_price DECIMAL(10, 2) DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+                UNIQUE(session_id, product_id)
+            )
+        `);
+        console.log('Таблица session_items создана/проверена');
+        
+        // Создать индекс для быстрого поиска по сессии
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_session_items_session_id ON session_items(session_id)
+        `);
+
         // Создать таблицу истории операций
         await pool.query(`
             CREATE TABLE IF NOT EXISTS history (
@@ -726,6 +751,12 @@ module.exports = {
     getOpenSessions,
     getSessionById,
     getSessionSales,
+    saveSessionItem,
+    updateSessionItemQuantity,
+    removeSessionItem,
+    getSessionItems,
+    clearSessionItems,
+    deleteSession,
     closeSession,
     saveHistory,
     testConnection

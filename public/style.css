@@ -1221,6 +1221,30 @@ body {
     transform: scale(1.02);
 }
 
+.session-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-delete-session {
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    color: var(--error);
+    border: 2px solid var(--error);
+    border-radius: 8px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-delete-session:hover {
+    background: var(--error);
+    color: white;
+    transform: scale(1.05);
+}
+
 @keyframes slideDown {
     from {
         opacity: 0;

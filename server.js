@@ -266,6 +266,93 @@ app.post('/api/sessions/:id/close', async (req, res) => {
     }
 });
 
+app.delete('/api/sessions/:id', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const session = await db.deleteSession(req.params.id);
+        if (!session) {
+            return res.status(404).json({ error: 'Сессия не найдена' });
+        }
+        res.json({ message: 'Сессия удалена', session });
+    } catch (error) {
+        console.error('Ошибка удаления сессии:', error);
+        res.status(500).json({ error: 'Ошибка удаления сессии' });
+    }
+});
+
+// API для работы с товарами в корзине сессии
+app.post('/api/sessions/:id/items', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const { product, quantity = 1 } = req.body;
+        if (!product || !product.id) {
+            return res.status(400).json({ error: 'Товар не указан' });
+        }
+        const item = await db.saveSessionItem(req.params.id, product, quantity);
+        res.status(201).json(item);
+    } catch (error) {
+        console.error('Ошибка сохранения товара в сессию:', error);
+        res.status(500).json({ error: 'Ошибка сохранения товара в сессию' });
+    }
+});
+
+app.put('/api/sessions/:id/items/:productId', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const { quantity } = req.body;
+        const item = await db.updateSessionItemQuantity(req.params.id, req.params.productId, quantity);
+        res.json(item);
+    } catch (error) {
+        console.error('Ошибка обновления товара в сессии:', error);
+        res.status(500).json({ error: 'Ошибка обновления товара в сессии' });
+    }
+});
+
+app.delete('/api/sessions/:id/items/:productId', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        await db.removeSessionItem(req.params.id, req.params.productId);
+        res.json({ message: 'Товар удален из корзины сессии' });
+    } catch (error) {
+        console.error('Ошибка удаления товара из сессии:', error);
+        res.status(500).json({ error: 'Ошибка удаления товара из сессии' });
+    }
+});
+
+app.get('/api/sessions/:id/items', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const items = await db.getSessionItems(req.params.id);
+        res.json(items);
+    } catch (error) {
+        console.error('Ошибка получения товаров сессии:', error);
+        res.status(500).json({ error: 'Ошибка получения товаров сессии' });
+    }
+});
+
+app.delete('/api/sessions/:id/items', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        await db.clearSessionItems(req.params.id);
+        res.json({ message: 'Корзина сессии очищена' });
+    } catch (error) {
+        console.error('Ошибка очистки корзины сессии:', error);
+        res.status(500).json({ error: 'Ошибка очистки корзины сессии' });
+    }
+});
+
 // Продажа товара (уменьшить количество на 1)
 app.post('/api/products/:id/sell', async (req, res) => {
     try {
