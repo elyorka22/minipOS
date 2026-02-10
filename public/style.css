@@ -772,22 +772,27 @@ body {
 .cart-item-price {
     color: var(--success);
     font-weight: 600;
-    font-size: 0.9rem;
-    margin-left: 0.5rem;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+}
+
+.cart-item-price strong {
+    color: var(--success);
+    font-size: 1.1rem;
 }
 
 .cart-item-profit {
     color: var(--accent);
     font-weight: 600;
-    font-size: 0.85rem;
-    margin-left: 0.5rem;
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
 }
 
 .cart-item-details {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    margin-top: 0.25rem;
+    margin-top: 0.5rem;
 }
 
 .warehouse-empty {
