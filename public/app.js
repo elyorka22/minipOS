@@ -369,6 +369,17 @@ async function startScanner(readerId, onSuccess) {
         // Используем 70% от минимального размера, но не меньше 250 и не больше 400
         const qrboxSize = Math.max(250, Math.min(400, Math.floor(minSize * 0.7)));
         
+        // Проверка доступности библиотеки
+        if (typeof Html5Qrcode === 'undefined') {
+            throw new Error('Библиотека html5-qrcode не загружена. Проверьте подключение скрипта.');
+        }
+        
+        if (typeof Html5QrcodeSupportedFormats === 'undefined') {
+            throw new Error('Html5QrcodeSupportedFormats не определен. Проверьте версию библиотеки.');
+        }
+        
+        console.log('Библиотека html5-qrcode загружена, версия:', Html5Qrcode?.version || 'неизвестна');
+        
         const config = {
             fps: 30, // Увеличена частота кадров для лучшего распознавания
             qrbox: { width: qrboxSize, height: qrboxSize }, // Адаптивный размер области сканирования
@@ -386,6 +397,12 @@ async function startScanner(readerId, onSuccess) {
             disableFlip: false, // Разрешить переворот изображения
             rememberLastUsedCameraId: true // Запоминать последнюю использованную камеру
         };
+        
+        console.log('Конфигурация сканера:', {
+            fps: config.fps,
+            qrbox: config.qrbox,
+            formats: config.formatsToSupport.map(f => f?.name || f)
+        });
         
         // Включить экспериментальные функции для лучшего распознавания (если доступны)
         if (typeof Html5Qrcode !== 'undefined' && Html5Qrcode.getCameras) {
@@ -406,52 +423,71 @@ async function startScanner(readerId, onSuccess) {
             facingMode: "environment"
         };
         
+        // Обработчик успешного распознавания
+        const onScanSuccess = (decodedText, decodedResult) => {
+            console.log('=== Штрих-код распознан ===');
+            console.log('Текст:', decodedText);
+            console.log('Тип:', decodedResult?.result?.format);
+            console.log('Длина:', decodedText?.length);
+            console.log('Полный результат:', decodedResult);
+            
+            // Нормализация штрих-кода перед обработкой
+            const normalizedBarcode = String(decodedText).trim();
+            console.log('Нормализованный:', normalizedBarcode);
+            
+            // Валидация штрих-кода перед обработкой
+            const validation = validateBarcode(normalizedBarcode);
+            console.log('Валидация:', validation);
+            
+            if (!validation.valid) {
+                console.warn('Штрих-код не прошел валидацию:', validation.reason);
+                // Показываем предупреждение, но не блокируем обработку для коротких кодов
+                if (normalizedBarcode.length < 4) {
+                    showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
+                    return;
+                }
+                // Для остальных случаев - предупреждение, но продолжаем
+                console.warn('Продолжаем обработку несмотря на предупреждение валидации');
+            }
+            
+            // Визуальная обратная связь при успешном сканировании
+            playSuccessSound();
+            vibrate([50, 30, 50]);
+            
+            console.log('Вызываем onSuccess с кодом:', normalizedBarcode);
+            onSuccess(normalizedBarcode);
+        };
+        
+        // Обработчик ошибок сканирования
+        const onScanError = (errorMessage) => {
+            // Логируем все ошибки для диагностики
+            if (errorMessage.includes('NotFoundException') || 
+                errorMessage.includes('No QR code') ||
+                errorMessage.includes('QR code parse error') ||
+                errorMessage.includes('No MultiFormat Readers')) {
+                // Это нормально - просто не нашли код в кадре, не логируем каждый раз
+                return;
+            }
+            
+            // Другие ошибки логируем для диагностики
+            console.warn('Ошибка сканирования:', errorMessage);
+            
+            // Если ошибка повторяется часто, показываем пользователю
+            if (errorMessage.includes('Permission denied') || 
+                errorMessage.includes('NotAllowedError')) {
+                showNotification('Нет доступа к камере. Проверьте разрешения.', 'error');
+            }
+        };
+        
+        console.log('Запуск сканера...');
         await currentScanner.start(
             cameraConfig,
             config,
-            (decodedText, decodedResult) => {
-                console.log('=== Штрих-код распознан ===');
-                console.log('Текст:', decodedText);
-                console.log('Тип:', decodedResult?.result?.format);
-                console.log('Длина:', decodedText?.length);
-                
-                // Нормализация штрих-кода перед обработкой
-                const normalizedBarcode = String(decodedText).trim();
-                console.log('Нормализованный:', normalizedBarcode);
-                
-                // Валидация штрих-кода перед обработкой
-                const validation = validateBarcode(normalizedBarcode);
-                console.log('Валидация:', validation);
-                
-                if (!validation.valid) {
-                    console.warn('Штрих-код не прошел валидацию:', validation.reason);
-                    // Показываем предупреждение, но не блокируем обработку для коротких кодов
-                    if (normalizedBarcode.length < 4) {
-                        showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
-                        return;
-                    }
-                    // Для остальных случаев - предупреждение, но продолжаем
-                    console.warn('Продолжаем обработку несмотря на предупреждение валидации');
-                }
-                
-                // Визуальная обратная связь при успешном сканировании
-                playSuccessSound();
-                vibrate([50, 30, 50]);
-                
-                console.log('Вызываем onSuccess с кодом:', normalizedBarcode);
-                onSuccess(normalizedBarcode);
-            },
-            (errorMessage) => {
-                // Логируем ошибки для анализа (но не показываем пользователю каждую)
-                // Большинство ошибок - это нормальные попытки распознавания
-                if (errorMessage.includes('NotFoundException') || errorMessage.includes('No QR code')) {
-                    // Это нормально - просто не нашли код в кадре
-                    return;
-                }
-                // Другие ошибки логируем для диагностики
-                console.debug('Ошибка сканирования:', errorMessage);
-            }
+            onScanSuccess,
+            onScanError
         );
+        
+        console.log('✓ Сканер успешно запущен');
     } catch (err) {
         console.error('Ошибка запуска камеры:', err);
         console.error('Детали ошибки:', {

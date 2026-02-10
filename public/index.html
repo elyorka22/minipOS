@@ -8,7 +8,19 @@
     <title>Учет товаров</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
+    <!-- Библиотека для сканирования штрих-кодов -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script>
+        // Проверка загрузки библиотеки
+        window.addEventListener('load', () => {
+            if (typeof Html5Qrcode === 'undefined') {
+                console.error('❌ Библиотека html5-qrcode не загружена!');
+                alert('Ошибка: библиотека сканера не загружена. Проверьте интернет-соединение.');
+            } else {
+                console.log('✅ Библиотека html5-qrcode загружена успешно');
+            }
+        });
+    </script>
 </head>
 <body>
     <!-- Проверка Telegram WebView -->
