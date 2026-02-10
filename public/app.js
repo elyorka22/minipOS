@@ -1862,14 +1862,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnNewSession.addEventListener('click', createNewSession);
     }
 
-    // Кнопки выбора сессии (делегирование событий)
+    // Кнопки выбора сессии и удаления (делегирование событий)
     const openSessionsList = document.getElementById('open-sessions-list');
     if (openSessionsList) {
-        openSessionsList.addEventListener('click', (e) => {
+        openSessionsList.addEventListener('click', async (e) => {
             const btn = e.target.closest('.btn-session');
+            const deleteBtn = e.target.closest('.btn-delete-session');
+            
             if (btn) {
                 const sessionId = btn.dataset.sessionId;
                 selectSession(sessionId);
+            } else if (deleteBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const sessionId = deleteBtn.dataset.sessionId;
+                const sessionNumber = deleteBtn.dataset.sessionNumber;
+                await deleteSessionConfirm(sessionId, sessionNumber);
             }
         });
     }
