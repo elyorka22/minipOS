@@ -344,7 +344,16 @@ async function startScanner(readerId, onSuccess) {
         const readerElement = document.getElementById(readerId);
         if (!readerElement) {
             console.error('Элемент сканера не найден:', readerId);
-            return;
+            throw new Error(`Элемент #${readerId} не найден в DOM`);
+        }
+        
+        // Проверить, что элемент видим (не скрыт)
+        const container = readerElement.closest('.scanner-container, .scanner-container-small');
+        if (container && container.classList.contains('hidden')) {
+            console.warn(`Контейнер сканера скрыт, пытаемся показать его`);
+            container.classList.remove('hidden');
+            // Дать время DOM обновиться
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         // Очистить предыдущий контент
