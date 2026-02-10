@@ -1546,10 +1546,45 @@ async function returnToSessionsSelector() {
     // Просто вернуться к выбору сессий, НЕ закрывая сессию
     saleCart = [];
     renderSaleCart();
-    currentSessionId = null;
-    currentSessionNumber = null;
+    if (currentScanner) {
+        stopScanner();
+    }
+    // НЕ сбрасываем currentSessionId и currentSessionNumber, чтобы сессия оставалась активной
     await loadOpenSessions();
     showSessionsSelector();
+}
+
+// Удалить сессию с подтверждением
+async function deleteSessionConfirm(sessionId, sessionNumber) {
+    const confirmed = confirm(`Вы уверены, что хотите удалить сессию ${sessionNumber}? Это действие нельзя отменить.`);
+    if (!confirmed) {
+        return;
+    }
+    
+    try {
+        await apiRequest(`/sessions/${sessionId}`, {
+            method: 'DELETE'
+        });
+        
+        showNotification(`Сессия ${sessionNumber} удалена`, 'success');
+        
+        // Если удаляемая сессия была текущей, сбросить её
+        if (currentSessionId === sessionId) {
+            currentSessionId = null;
+            currentSessionNumber = null;
+            saleCart = [];
+            renderSaleCart();
+            if (currentScanner) {
+                stopScanner();
+            }
+        }
+        
+        // Обновить список сессий
+        await loadOpenSessions();
+    } catch (error) {
+        console.error('Ошибка удаления сессии:', error);
+        showNotification('Ошибка удаления сессии', 'error');
+    }
 }
 
 // Загрузка статистики
@@ -2007,11 +2042,11 @@ document.addEventListener('visibilitychange', () => {
                 // Запускать камеру только если есть активная сессия и показывается интерфейс продажи
                 const scannerSection = document.getElementById('sale-scanner-section');
                 if (currentSessionId && scannerSection && !scannerSection.classList.contains('hidden')) {
-                    setTimeout(() => {
+                setTimeout(() => {
                         startScanner('reader-sale', handleSale).catch(error => {
                             console.error('Ошибка возобновления сканера:', error);
                         });
-                    }, 300);
+                }, 300);
                 }
             } else if (viewId === 'view-product-info') {
                 setTimeout(() => {
