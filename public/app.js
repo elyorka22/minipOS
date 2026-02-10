@@ -1737,6 +1737,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    // Кнопка создания новой сессии
+    const btnNewSession = document.getElementById('btn-new-session');
+    if (btnNewSession) {
+        btnNewSession.addEventListener('click', createNewSession);
+    }
+
+    // Кнопки выбора сессии (делегирование событий)
+    const openSessionsList = document.getElementById('open-sessions-list');
+    if (openSessionsList) {
+        openSessionsList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-session');
+            if (btn) {
+                const sessionId = btn.dataset.sessionId;
+                selectSession(sessionId);
+            }
+        });
+    }
+
+    // Кнопка закрытия сессии
+    const btnCloseSession = document.getElementById('btn-close-session');
+    if (btnCloseSession) {
+        btnCloseSession.addEventListener('click', closeCurrentSession);
+    }
+
     // Модальное окно редактирования
     document.getElementById('modal-edit-close').addEventListener('click', () => {
         document.getElementById('modal-edit-product').classList.add('hidden');
