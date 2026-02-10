@@ -246,6 +246,22 @@ app.post('/api/products/:id/receive', async (req, res) => {
     }
 });
 
+// Получить статистику
+app.get('/api/stats', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const period = req.query.period || 'day'; // day, week, month
+        const stats = await db.getStats(period);
+        res.json(stats);
+    } catch (error) {
+        console.error('Ошибка получения статистики:', error);
+        res.status(500).json({ error: 'Ошибка получения статистики' });
+    }
+});
+
 // Получить историю операций
 app.get('/api/history', async (req, res) => {
     try {
@@ -272,10 +288,8 @@ app.get('/api/stats', async (req, res) => {
             return res.status(503).json({ error: 'База данных не инициализирована' });
         }
 
-        const startDate = req.query.startDate || null;
-        const endDate = req.query.endDate || null;
-
-        const stats = await db.getSalesStats(startDate, endDate);
+        const period = req.query.period || 'day'; // day, week, month
+        const stats = await db.getStats(period);
         res.json(stats);
     } catch (error) {
         console.error('Ошибка получения статистики:', error);

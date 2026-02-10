@@ -649,7 +649,7 @@ function renderSaleCart() {
                 <div class="cart-item-info">
                     <div class="cart-item-name">${escapeHtml(item.name || 'Без названия')}</div>
                     <div class="cart-item-details">
-                        ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} ₽ × ${quantityInCart} = <strong>${itemTotal.toFixed(2)} ₽</strong></span>` : '<span class="cart-item-price">Цена не указана</span>'}
+                        ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} сум × ${quantityInCart} = <strong>${itemTotal.toFixed(2)} сум</strong></span>` : '<span class="cart-item-price">Цена не указана</span>'}
                     </div>
                 </div>
                 <div class="cart-item-controls">
@@ -671,7 +671,7 @@ function renderSaleCart() {
     const cartTotalCount = saleCart.reduce((sum, item) => sum + (parseInt(item.quantityInCart) || 0), 0);
     if (totalCountEl) {
         if (totalAmount > 0) {
-            totalCountEl.innerHTML = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
+            totalCountEl.innerHTML = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} сум</strong>`;
         } else {
             totalCountEl.textContent = cartTotalCount;
         }
@@ -805,7 +805,7 @@ async function sellAllFromCart() {
         const totalCount = soldItems.length;
         if (totalCount > 0) {
             const message = totalAmount > 0 
-                ? `Продано товаров: ${totalCount} на сумму ${totalAmount.toFixed(2)} ₽`
+                ? `Продано товаров: ${totalCount} на сумму ${totalAmount.toFixed(2)} сум`
                 : `Продано товаров: ${totalCount}`;
             showNotification(message, 'success');
         }
@@ -880,11 +880,11 @@ async function handleProductInfo(barcode) {
     if (priceEl) {
         let priceText = '';
         if (price > 0) {
-            priceText = `Продажа: ${price.toFixed(2)} ₽`;
-            if (purchasePrice > 0) {
-                priceText += ` | Закупка: ${purchasePrice.toFixed(2)} ₽`;
-                if (profit > 0) {
-                    priceText += ` | Прибыль: <strong style="color: var(--success);">${profit.toFixed(2)} ₽</strong>`;
+            priceText = `Продажа: ${price.toFixed(2)} сум`;
+        if (purchasePrice > 0) {
+                priceText += ` | Закупка: ${purchasePrice.toFixed(2)} сум`;
+            if (profit > 0) {
+                    priceText += ` | Прибыль: <strong style="color: var(--success);">${profit.toFixed(2)} сум</strong>`;
                 }
             }
         } else {
@@ -1045,9 +1045,9 @@ async function renderWarehouse(filteredProducts = null) {
                     <div class="warehouse-item-info">
                         <div class="warehouse-item-name">${escapeHtml(product.name || 'Без названия')}</div>
                         <div class="warehouse-item-barcode">Штрих-код: ${escapeHtml(product.barcode || 'Не указан')}</div>
-                        ${price > 0 ? `<div class="warehouse-item-price">Продажа: ${price.toFixed(2)} ₽</div>` : ''}
-                        ${purchasePrice > 0 ? `<div class="warehouse-item-purchase-price">Закупка: ${purchasePrice.toFixed(2)} ₽</div>` : ''}
-                        ${profit > 0 ? `<div class="warehouse-item-profit">Прибыль: ${profit.toFixed(2)} ₽</div>` : ''}
+                        ${price > 0 ? `<div class="warehouse-item-price">Продажа: ${price.toFixed(2)} сум</div>` : ''}
+                        ${purchasePrice > 0 ? `<div class="warehouse-item-purchase-price">Закупка: ${purchasePrice.toFixed(2)} сум</div>` : ''}
+                        ${profit > 0 ? `<div class="warehouse-item-profit">Прибыль: ${profit.toFixed(2)} сум</div>` : ''}
                 </div>
                     <div class="warehouse-item-stock">${product.quantity || 0}</div>
             </div>
@@ -1258,6 +1258,85 @@ function searchHistory(query) {
     );
     
     renderHistory(filtered);
+}
+
+// Загрузка статистики
+async function loadStats(period = 'day') {
+    try {
+        return await apiRequest(`/stats?period=${period}`);
+    } catch (error) {
+        console.error('Ошибка загрузки статистики:', error);
+        showNotification('Ошибка загрузки статистики', 'error');
+        return null;
+    }
+}
+
+// Отображение статистики
+let currentStatsPeriod = 'day';
+
+async function renderStats(period = 'day') {
+    currentStatsPeriod = period;
+    
+    // Обновить активную кнопку периода
+    document.querySelectorAll('.btn-period').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.period === period) {
+            btn.classList.add('active');
+        }
+    });
+    
+    const stats = await loadStats(period);
+    
+    if (!stats) {
+        document.getElementById('stats-content').innerHTML = '<div class="warehouse-empty">Ошибка загрузки статистики</div>';
+        return;
+    }
+    
+    // Обновить общую статистику
+    document.getElementById('stat-total-sales').textContent = `${stats.totalSales.toFixed(2)} сум`;
+    document.getElementById('stat-total-profit').textContent = `${stats.totalProfit.toFixed(2)} сум`;
+    document.getElementById('stat-sales-count').textContent = stats.salesCount;
+    
+    // Топ товаров по продажам
+    const topSalesEl = document.getElementById('stats-top-sales');
+    if (stats.topSales.length === 0) {
+        topSalesEl.innerHTML = '<div class="warehouse-empty">Нет данных о продажах</div>';
+    } else {
+        topSalesEl.innerHTML = stats.topSales.map((item, index) => `
+            <div class="top-product-item">
+                <div class="top-product-rank">${index + 1}</div>
+                <div class="top-product-info">
+                    <div class="top-product-name">${escapeHtml(item.productName)}</div>
+                    <div class="top-product-barcode">${escapeHtml(item.productBarcode)}</div>
+                </div>
+                <div class="top-product-stats">
+                    <div class="top-product-quantity">${item.totalQuantity} шт.</div>
+                    <div class="top-product-amount">${item.totalAmount.toFixed(2)} сум</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Топ товаров по прибыльности
+    const topProfitEl = document.getElementById('stats-top-profit');
+    if (stats.topProfit.length === 0) {
+        topProfitEl.innerHTML = '<div class="warehouse-empty">Нет данных о прибыли</div>';
+    } else {
+        topProfitEl.innerHTML = stats.topProfit.map((item, index) => `
+            <div class="top-product-item">
+                <div class="top-product-rank">${index + 1}</div>
+                <div class="top-product-info">
+                    <div class="top-product-name">${escapeHtml(item.productName)}</div>
+                    <div class="top-product-barcode">${escapeHtml(item.productBarcode)}</div>
+                </div>
+                <div class="top-product-stats">
+                    <div class="top-product-quantity">${item.totalQuantity} шт.</div>
+                    <div class="top-product-profit">${item.totalProfit.toFixed(2)} сум</div>
+                    <div class="top-product-amount">${item.totalAmount.toFixed(2)} сум</div>
+                </div>
+            </div>
+        `).join('');
+    }
 }
 
 // Экранирование HTML
@@ -1536,6 +1615,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             searchHistory(e.target.value);
         });
     }
+
+    // Кнопки периода статистики
+    document.querySelectorAll('.btn-period').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const period = btn.dataset.period;
+            renderStats(period);
+        });
+    });
 
     // Модальное окно редактирования
     document.getElementById('modal-edit-close').addEventListener('click', () => {

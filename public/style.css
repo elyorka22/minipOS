@@ -1045,6 +1045,148 @@ body {
     border-left: 4px solid var(--error);
 }
 
+/* Статистика */
+.stats-period-selector {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem;
+    justify-content: center;
+}
+
+.btn-period {
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 2px solid var(--bg-tertiary);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-period:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+}
+
+.btn-period.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.stats-content {
+    padding: 1rem;
+}
+
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border-left: 4px solid var(--accent);
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.stat-value.stat-profit {
+    color: var(--success);
+}
+
+.stats-top-products {
+    margin-bottom: 2rem;
+}
+
+.stats-top-products h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.top-products-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.top-product-item {
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-left: 4px solid var(--accent);
+}
+
+.top-product-rank {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 40px;
+    text-align: center;
+}
+
+.top-product-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.top-product-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    word-wrap: break-word;
+}
+
+.top-product-barcode {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.top-product-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: right;
+    min-width: 120px;
+}
+
+.top-product-quantity {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.top-product-amount {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.top-product-profit {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--success);
+}
+
 @keyframes slideDown {
     from {
         opacity: 0;

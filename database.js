@@ -432,6 +432,94 @@ async function testConnection() {
     }
 }
 
+// Получить статистику продаж за период
+async function getStats(period = 'day') {
+    try {
+        let dateFilter = '';
+        const now = new Date();
+        
+        switch (period) {
+            case 'day':
+                dateFilter = `created_at >= CURRENT_DATE`;
+                break;
+            case 'week':
+                dateFilter = `created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+                break;
+            case 'month':
+                dateFilter = `created_at >= CURRENT_DATE - INTERVAL '30 days'`;
+                break;
+            default:
+                dateFilter = `created_at >= CURRENT_DATE`;
+        }
+        
+        // Общая статистика продаж
+        const salesStats = await pool.query(`
+            SELECT 
+                COUNT(*) as sales_count,
+                COALESCE(SUM(total_amount), 0) as total_sales,
+                COALESCE(SUM(profit), 0) as total_profit
+            FROM history
+            WHERE operation_type = 'sale' AND ${dateFilter}
+        `);
+        
+        // Топ товаров по продажам (по количеству проданных единиц)
+        const topSales = await pool.query(`
+            SELECT 
+                product_id,
+                product_name,
+                product_barcode,
+                SUM(quantity) as total_quantity,
+                SUM(total_amount) as total_amount
+            FROM history
+            WHERE operation_type = 'sale' AND ${dateFilter}
+            GROUP BY product_id, product_name, product_barcode
+            ORDER BY total_quantity DESC
+            LIMIT 10
+        `);
+        
+        // Топ товаров по прибыльности
+        const topProfit = await pool.query(`
+            SELECT 
+                product_id,
+                product_name,
+                product_barcode,
+                SUM(quantity) as total_quantity,
+                SUM(profit) as total_profit,
+                SUM(total_amount) as total_amount
+            FROM history
+            WHERE operation_type = 'sale' AND ${dateFilter}
+            GROUP BY product_id, product_name, product_barcode
+            ORDER BY total_profit DESC
+            LIMIT 10
+        `);
+        
+        return {
+            period,
+            totalSales: parseFloat(salesStats.rows[0]?.total_sales || 0),
+            totalProfit: parseFloat(salesStats.rows[0]?.total_profit || 0),
+            salesCount: parseInt(salesStats.rows[0]?.sales_count || 0),
+            topSales: topSales.rows.map(row => ({
+                productId: row.product_id,
+                productName: row.product_name,
+                productBarcode: row.product_barcode,
+                totalQuantity: parseInt(row.total_quantity || 0),
+                totalAmount: parseFloat(row.total_amount || 0)
+            })),
+            topProfit: topProfit.rows.map(row => ({
+                productId: row.product_id,
+                productName: row.product_name,
+                productBarcode: row.product_barcode,
+                totalQuantity: parseInt(row.total_quantity || 0),
+                totalProfit: parseFloat(row.total_profit || 0),
+                totalAmount: parseFloat(row.total_amount || 0)
+            }))
+        };
+    } catch (error) {
+        console.error('Ошибка получения статистики:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     pool,
     initDatabase,
@@ -445,6 +533,7 @@ module.exports = {
     decreaseQuantity,
     getHistory,
     getSalesStats,
+    getStats,
     testConnection
 };
 

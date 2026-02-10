@@ -53,6 +53,10 @@
                 <span class="btn-icon">📊</span>
                 <span class="btn-text">История</span>
             </button>
+            <button id="btn-stats" class="nav-btn" data-view="stats">
+                <span class="btn-icon">📈</span>
+                <span class="btn-text">Статистика</span>
+            </button>
         </nav>
 
         <!-- Экран продажи -->
@@ -176,11 +180,11 @@
                         <input type="number" id="input-product-quantity" min="0" value="0" class="input-field">
                     </label>
                     <label>
-                        Цена продажи (₽):
+                        Цена продажи (сум):
                         <input type="number" id="input-product-price" min="0" step="0.01" value="0" class="input-field" placeholder="0.00">
                     </label>
                     <label>
-                        Закупочная цена (₽):
+                        Закупочная цена (сум):
                         <input type="number" id="input-product-purchase-price" min="0" step="0.01" value="0" class="input-field" placeholder="0.00">
                     </label>
                     <div class="modal-actions">
@@ -201,6 +205,46 @@
             </div>
             <div id="history-list" class="history-list">
                 <!-- Список операций будет здесь -->
+            </div>
+        </div>
+
+        <!-- Экран статистики -->
+        <div id="view-stats" class="view">
+            <div class="view-header">
+                <h1>Статистика</h1>
+            </div>
+            <div class="stats-period-selector">
+                <button class="btn-period active" data-period="day">День</button>
+                <button class="btn-period" data-period="week">Неделя</button>
+                <button class="btn-period" data-period="month">Месяц</button>
+            </div>
+            <div id="stats-content" class="stats-content">
+                <div class="stats-summary">
+                    <div class="stat-card">
+                        <div class="stat-label">Общая сумма продаж</div>
+                        <div class="stat-value" id="stat-total-sales">0 сум</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Чистая прибыль</div>
+                        <div class="stat-value stat-profit" id="stat-total-profit">0 сум</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Количество продаж</div>
+                        <div class="stat-value" id="stat-sales-count">0</div>
+                    </div>
+                </div>
+                <div class="stats-top-products">
+                    <h2>Топ товаров по продажам</h2>
+                    <div id="stats-top-sales" class="top-products-list">
+                        <!-- Топ товаров по продажам -->
+                    </div>
+                </div>
+                <div class="stats-top-products">
+                    <h2>Топ товаров по прибыльности</h2>
+                    <div id="stats-top-profit" class="top-products-list">
+                        <!-- Топ товаров по прибыльности -->
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -257,11 +301,11 @@
                         <input type="number" id="edit-product-quantity" min="0" value="0" class="input-field">
                     </label>
                     <label>
-                        Цена продажи (₽):
+                        Цена продажи (сум):
                         <input type="number" id="edit-product-price" min="0" step="0.01" value="0" class="input-field" placeholder="0.00">
                     </label>
                     <label>
-                        Закупочная цена (₽):
+                        Закупочная цена (сум):
                         <input type="number" id="edit-product-purchase-price" min="0" step="0.01" value="0" class="input-field" placeholder="0.00">
                     </label>
                     <div class="modal-actions">
