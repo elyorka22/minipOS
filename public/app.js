@@ -822,6 +822,9 @@ async function sellAllFromCart() {
         saleCart = [];
         renderSaleCart();
         
+        // Закрыть сессию и вернуться к выбору сессий
+        await closeSessionAndReturn();
+        
         // Обновить склад если открыт
         const activeView = document.querySelector('.view.active');
         if (activeView && activeView.id === 'view-warehouse') {
@@ -1320,32 +1323,6 @@ async function selectSession(sessionId) {
     }
 }
 
-async function closeCurrentSession() {
-    if (!currentSessionId) {
-        showNotification('Нет активной сессии', 'error');
-        return;
-    }
-    
-    if (!confirm(`Закрыть сессию ${currentSessionNumber}? Все продажи будут сохранены.`)) {
-        return;
-    }
-    
-    try {
-        await apiRequest(`/sessions/${currentSessionId}/close`, {
-            method: 'POST'
-        });
-        showNotification(`Сессия ${currentSessionNumber} закрыта`, 'success');
-        currentSessionId = null;
-        currentSessionNumber = null;
-        saleCart = [];
-        renderSaleCart();
-        await loadOpenSessions();
-        showSessionsSelector();
-    } catch (error) {
-        console.error('Ошибка закрытия сессии:', error);
-        showNotification('Ошибка закрытия сессии', 'error');
-    }
-}
 
 function showSessionsSelector() {
     document.getElementById('sessions-selector').classList.remove('hidden');
@@ -1776,10 +1753,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Кнопка закрытия сессии
-    const btnCloseSession = document.getElementById('btn-close-session');
-    if (btnCloseSession) {
-        btnCloseSession.addEventListener('click', closeCurrentSession);
+    // Кнопка "Назад" к выбору сессий
+    const btnBackToSessions = document.getElementById('btn-back-to-sessions');
+    if (btnBackToSessions) {
+        btnBackToSessions.addEventListener('click', async () => {
+            await closeSessionAndReturn();
+        });
     }
 
     // Модальное окно редактирования
