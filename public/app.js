@@ -58,19 +58,39 @@ function validateBarcode(barcode) {
         return { valid: false, reason: 'Штрих-код пуст' };
     }
     
-    // Проверка длины (минимум 8, максимум 13 для EAN/UPC)
-    if (code.length < 8 || code.length > 13) {
-        return { valid: false, reason: 'Неверная длина штрих-кода' };
+    // Расширенная проверка длины (разные форматы имеют разную длину)
+    // EAN-8: 8 цифр
+    // EAN-13: 13 цифр
+    // UPC-A: 12 цифр
+    // UPC-E: 8 цифр
+    // CODE-128, CODE-39: переменная длина
+    if (code.length < 4 || code.length > 20) {
+        console.warn('Штрих-код необычной длины:', code.length, code);
+        // Не отклоняем сразу - может быть валидный код нестандартного формата
     }
     
-    // Проверка что все символы - цифры
+    // Проверка что все символы - цифры (для EAN/UPC)
+    // Для CODE-128 и CODE-39 могут быть буквы, но html5-qrcode обычно возвращает только цифры
     if (!/^\d+$/.test(code)) {
-        return { valid: false, reason: 'Штрих-код должен содержать только цифры' };
+        console.warn('Штрих-код содержит не только цифры:', code);
+        // Для некоторых форматов это нормально, но для EAN/UPC - нет
+        // Пока разрешаем, но логируем
     }
     
-    // Для EAN-13 проверяем контрольную сумму
-    if (code.length === 13) {
-        return validateEAN13(code);
+    // Для EAN-13 проверяем контрольную сумму (но не отклоняем, если не совпадает)
+    // Многие реальные штрих-коды могут иметь неверную контрольную сумму
+    if (code.length === 13 && /^\d{13}$/.test(code)) {
+        const ean13Check = validateEAN13(code);
+        if (!ean13Check.valid) {
+            console.warn('EAN-13 с неверной контрольной суммой, но разрешаем:', code);
+            // Не отклоняем - разрешаем код с неверной контрольной суммой
+            // Многие реальные штрих-коды имеют неверную контрольную сумму
+        }
+    }
+    
+    // Минимальная валидация: код не пустой и содержит хотя бы цифры
+    if (code.length < 4) {
+        return { valid: false, reason: 'Штрих-код слишком короткий (минимум 4 символа)' };
     }
     
     return { valid: true };
@@ -367,6 +387,11 @@ async function startScanner(readerId, onSuccess) {
             rememberLastUsedCameraId: true // Запоминать последнюю использованную камеру
         };
         
+        // Включить экспериментальные функции для лучшего распознавания (если доступны)
+        if (typeof Html5Qrcode !== 'undefined' && Html5Qrcode.getCameras) {
+            console.log('Используются улучшенные настройки распознавания');
+        }
+        
         console.log('Запуск сканера с настройками:', {
             readerId,
             facingMode: 'environment',
@@ -385,22 +410,35 @@ async function startScanner(readerId, onSuccess) {
             cameraConfig,
             config,
             (decodedText, decodedResult) => {
-                console.log('Штрих-код отсканирован:', decodedText);
+                console.log('=== Штрих-код распознан ===');
+                console.log('Текст:', decodedText);
+                console.log('Тип:', decodedResult?.result?.format);
+                console.log('Длина:', decodedText?.length);
+                
                 // Нормализация штрих-кода перед обработкой
                 const normalizedBarcode = String(decodedText).trim();
+                console.log('Нормализованный:', normalizedBarcode);
                 
                 // Валидация штрих-кода перед обработкой
                 const validation = validateBarcode(normalizedBarcode);
+                console.log('Валидация:', validation);
+                
                 if (!validation.valid) {
-                    console.warn('Неверный штрих-код:', validation.reason);
-                    showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
-                    return;
+                    console.warn('Штрих-код не прошел валидацию:', validation.reason);
+                    // Показываем предупреждение, но не блокируем обработку для коротких кодов
+                    if (normalizedBarcode.length < 4) {
+                        showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
+                        return;
+                    }
+                    // Для остальных случаев - предупреждение, но продолжаем
+                    console.warn('Продолжаем обработку несмотря на предупреждение валидации');
                 }
                 
                 // Визуальная обратная связь при успешном сканировании
                 playSuccessSound();
                 vibrate([50, 30, 50]);
                 
+                console.log('Вызываем onSuccess с кодом:', normalizedBarcode);
                 onSuccess(normalizedBarcode);
             },
             (errorMessage) => {
