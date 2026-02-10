@@ -837,10 +837,13 @@ async function sellAllFromCart() {
 }
 
 // Очистить корзину
-function clearSaleCart() {
+async function clearSaleCart() {
     saleCart = [];
     renderSaleCart();
     showNotification('Корзина очищена', 'success');
+    
+    // Закрыть сессию и вернуться к выбору сессий
+    await closeSessionAndReturn();
 }
 
 // Сделать функции глобальными для onclick
