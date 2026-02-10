@@ -12,6 +12,12 @@ let currentProduct = null;
 
 // Корзина для продажи
 let saleCart = [];
+// Текущая активная сессия
+let currentSessionId = null;
+let currentSessionNumber = null;
+// Текущая активная сессия
+let currentSessionId = null;
+let currentSessionNumber = null;
 
 // Защита от повторных сканирований одного штрих-кода
 let lastScannedBarcode = null;
@@ -793,7 +799,7 @@ async function sellAllFromCart() {
                 
                 // Продать товар нужное количество раз
                 for (let i = 0; i < item.quantityInCart; i++) {
-                    const updatedProduct = await sellProduct(item.id, price, purchasePrice);
+                    const updatedProduct = await sellProduct(item.id, price, purchasePrice, currentSessionId);
                     soldItems.push(updatedProduct);
                 }
             } catch (error) {
@@ -1258,6 +1264,116 @@ function searchHistory(query) {
     );
     
     renderHistory(filtered);
+}
+
+// Работа с сессиями
+async function createNewSession() {
+    try {
+        const session = await apiRequest('/sessions', {
+            method: 'POST'
+        });
+        currentSessionId = session.id;
+        currentSessionNumber = session.session_number;
+        await loadOpenSessions();
+        showSaleInterface();
+        showNotification(`Сессия ${currentSessionNumber} начата`, 'success');
+    } catch (error) {
+        console.error('Ошибка создания сессии:', error);
+        showNotification('Ошибка создания сессии', 'error');
+    }
+}
+
+async function loadOpenSessions() {
+    try {
+        const sessions = await apiRequest('/sessions/open');
+        renderSessionsList(sessions);
+        return sessions;
+    } catch (error) {
+        console.error('Ошибка загрузки сессий:', error);
+        return [];
+    }
+}
+
+function renderSessionsList(sessions) {
+    const listEl = document.getElementById('open-sessions-list');
+    if (!listEl) return;
+    
+    if (sessions.length === 0) {
+        listEl.innerHTML = '';
+        return;
+    }
+    
+    listEl.innerHTML = sessions.map(session => `
+        <button class="btn-session" data-session-id="${session.id}" data-session-number="${session.session_number}">
+            Сессия ${session.session_number}
+        </button>
+    `).join('');
+}
+
+async function selectSession(sessionId) {
+    try {
+        const session = await apiRequest(`/sessions/${sessionId}`);
+        currentSessionId = session.id;
+        currentSessionNumber = session.session_number;
+        showSaleInterface();
+        showNotification(`Сессия ${currentSessionNumber} активирована`, 'success');
+    } catch (error) {
+        console.error('Ошибка выбора сессии:', error);
+        showNotification('Ошибка выбора сессии', 'error');
+    }
+}
+
+async function closeCurrentSession() {
+    if (!currentSessionId) {
+        showNotification('Нет активной сессии', 'error');
+        return;
+    }
+    
+    if (!confirm(`Закрыть сессию ${currentSessionNumber}? Все продажи будут сохранены.`)) {
+        return;
+    }
+    
+    try {
+        await apiRequest(`/sessions/${currentSessionId}/close`, {
+            method: 'POST'
+        });
+        showNotification(`Сессия ${currentSessionNumber} закрыта`, 'success');
+        currentSessionId = null;
+        currentSessionNumber = null;
+        saleCart = [];
+        renderSaleCart();
+        await loadOpenSessions();
+        showSessionsSelector();
+    } catch (error) {
+        console.error('Ошибка закрытия сессии:', error);
+        showNotification('Ошибка закрытия сессии', 'error');
+    }
+}
+
+function showSessionsSelector() {
+    document.getElementById('sessions-selector').classList.remove('hidden');
+    document.getElementById('sale-scanner-section').classList.add('hidden');
+    document.getElementById('sale-cart').classList.add('hidden');
+    document.getElementById('btn-clear-cart').style.display = 'none';
+    document.getElementById('btn-close-session').style.display = 'none';
+    document.getElementById('current-session-info').style.display = 'none';
+    if (currentScanner) {
+        stopScanner();
+    }
+}
+
+function showSaleInterface() {
+    document.getElementById('sessions-selector').classList.add('hidden');
+    document.getElementById('sale-scanner-section').classList.remove('hidden');
+    document.getElementById('sale-cart').classList.remove('hidden');
+    document.getElementById('btn-close-session').style.display = 'block';
+    document.getElementById('current-session-info').style.display = 'block';
+    document.getElementById('current-session-number').textContent = currentSessionNumber;
+    
+    // Запустить сканер
+    setTimeout(() => {
+        startScanner('reader-sale', handleSale);
+    }, 300);
 }
 
 // Загрузка статистики

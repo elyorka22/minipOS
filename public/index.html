@@ -64,14 +64,28 @@
             <div class="view-header">
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                     <h1>Продажа товара</h1>
-                    <button id="btn-clear-cart" class="btn-secondary" style="display: none; padding: 0.5rem 1rem; font-size: 0.9rem;">Очистить</button>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span id="current-session-info" style="display: none; font-size: 0.9rem; color: var(--text-secondary);">Сессия <span id="current-session-number">-</span></span>
+                        <button id="btn-close-session" class="btn-secondary" style="display: none; padding: 0.5rem 1rem; font-size: 0.9rem;">Закрыть сессию</button>
+                        <button id="btn-clear-cart" class="btn-secondary" style="display: none; padding: 0.5rem 1rem; font-size: 0.9rem;">Очистить</button>
+                    </div>
                 </div>
             </div>
-            <div id="scanner-container-sale" class="scanner-container">
-                <div id="reader-sale"></div>
-                <div class="scanner-overlay">
-                    <div class="scanner-frame"></div>
-                    <p class="scanner-hint">Наведите камеру на штрих-код</p>
+            <!-- Выбор сессии -->
+            <div id="sessions-selector" class="sessions-selector">
+                <button id="btn-new-session" class="btn-primary btn-large">Начать новую сессию</button>
+                <div id="open-sessions-list" class="open-sessions-list">
+                    <!-- Список открытых сессий будет здесь -->
+                </div>
+            </div>
+            <!-- Сканер и корзина (скрыты по умолчанию) -->
+            <div id="sale-scanner-section" class="hidden">
+                <div id="scanner-container-sale" class="scanner-container">
+                    <div id="reader-sale"></div>
+                    <div class="scanner-overlay">
+                        <div class="scanner-frame"></div>
+                        <p class="scanner-hint">Наведите камеру на штрих-код</p>
+                    </div>
                 </div>
             </div>
             <div id="sale-add-product-prompt" class="add-product-prompt hidden">

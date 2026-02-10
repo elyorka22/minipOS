@@ -85,10 +85,26 @@ async function initDatabase() {
             // Продолжаем работу, даже если не удалось добавить поле
         }
 
+        // Создать таблицу сессий продаж
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS sessions (
+                id SERIAL PRIMARY KEY,
+                session_number INTEGER NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'open',
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                closed_at TIMESTAMP,
+                total_sales DECIMAL(10, 2) DEFAULT 0,
+                total_profit DECIMAL(10, 2) DEFAULT 0,
+                sales_count INTEGER DEFAULT 0
+            )
+        `);
+        console.log('Таблица sessions создана/проверена');
+
         // Создать таблицу истории операций
         await pool.query(`
             CREATE TABLE IF NOT EXISTS history (
                 id SERIAL PRIMARY KEY,
+                session_id INTEGER,
                 product_id VARCHAR(255) NOT NULL,
                 product_name VARCHAR(255) NOT NULL,
                 product_barcode VARCHAR(255) NOT NULL,
@@ -99,7 +115,8 @@ async function initDatabase() {
                 price DECIMAL(10, 2) DEFAULT 0,
                 total_amount DECIMAL(10, 2) DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+                FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL
             )
         `);
         console.log('Таблица history создана/проверена');
@@ -114,6 +131,36 @@ async function initDatabase() {
                 ALTER TABLE history 
                 ADD COLUMN IF NOT EXISTS total_amount DECIMAL(10, 2) DEFAULT 0
             `);
+            
+            // Добавить поле session_id если его нет
+            const sessionIdCheck = await pool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'history' 
+                AND column_name = 'session_id'
+            `);
+            
+            if (sessionIdCheck.rows.length === 0) {
+                await pool.query(`
+                    ALTER TABLE history 
+                    ADD COLUMN session_id INTEGER
+                `);
+                // Добавить внешний ключ отдельно, если таблица sessions уже существует
+                try {
+                    await pool.query(`
+                        ALTER TABLE history 
+                        ADD CONSTRAINT fk_history_session 
+                        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL
+                    `);
+                } catch (fkError) {
+                    // Игнорируем ошибку если внешний ключ уже существует
+                    if (!fkError.message.includes('already exists')) {
+                        console.warn('Предупреждение при добавлении внешнего ключа session_id:', fkError.message);
+                    }
+                }
+                console.log('✓ Поле session_id добавлено в history');
+            }
             console.log('Поля price и total_amount добавлены/проверены в history');
         } catch (error) {
             if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
@@ -280,26 +327,9 @@ async function deleteProduct(id) {
     }
 }
 
-// Сохранить операцию в историю
-async function saveHistory(product, operationType, quantity, quantityBefore, quantityAfter, price = null, totalAmount = null, purchasePrice = null) {
-    try {
-        // Если цена не передана, берем из товара
-        const productPrice = price !== null ? price : (product.price || 0);
-        const productPurchasePrice = purchasePrice !== null ? purchasePrice : (product.purchase_price || 0);
-        // Если общая сумма не передана, вычисляем
-        const amount = totalAmount !== null ? totalAmount : (productPrice * quantity);
-        // Рассчитываем прибыль только для продаж
-        const profit = operationType === 'sale' ? (productPrice - productPurchasePrice) * quantity : 0;
-        
-        await pool.query(
-            `INSERT INTO history (product_id, product_name, product_barcode, operation_type, quantity, quantity_before, quantity_after, price, purchase_price, total_amount, profit)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-            [product.id, product.name, product.barcode, operationType, quantity, quantityBefore, quantityAfter, productPrice, productPurchasePrice, amount, profit]
-        );
-    } catch (error) {
-        console.error('Ошибка сохранения истории:', error);
-        // Не прерываем выполнение, если не удалось сохранить историю
-    }
+// Сохранить операцию в историю (старая версия для обратной совместимости)
+async function saveHistoryOld(product, operationType, quantity, quantityBefore, quantityAfter, price = null, totalAmount = null, purchasePrice = null) {
+    return saveHistory(product, operationType, quantity, quantityBefore, quantityAfter, price, totalAmount, purchasePrice, null);
 }
 
 // Увеличить количество товара
@@ -320,8 +350,8 @@ async function increaseQuantity(id, amount) {
         
         const productAfter = result.rows[0];
         if (productAfter) {
-            // Сохранить в историю
-            await saveHistory(productAfter, 'receive', amount, quantityBefore, productAfter.quantity);
+            // Сохранить в историю (приемка не привязана к сессии)
+            await saveHistory(productAfter, 'receive', amount, quantityBefore, productAfter.quantity, null, null, null, null);
         }
         
         return productAfter || null;
@@ -331,8 +361,8 @@ async function increaseQuantity(id, amount) {
     }
 }
 
-// Уменьшить количество товара
-async function decreaseQuantity(id, amount = 1, price = null, purchasePrice = null) {
+// Уменьшить количество товара (для продажи, может принимать session_id)
+async function decreaseQuantity(id, amount = 1, price = null, purchasePrice = null, sessionId = null) {
     try {
         // Получить текущее состояние товара
         const productBefore = await getProductById(id);
@@ -353,8 +383,8 @@ async function decreaseQuantity(id, amount = 1, price = null, purchasePrice = nu
         
         const productAfter = result.rows[0];
         if (productAfter) {
-            // Сохранить в историю с ценами
-            await saveHistory(productAfter, 'sale', amount, quantityBefore, productAfter.quantity, productPrice, totalAmount, productPurchasePrice);
+            // Сохранить в историю с ценами и session_id
+            await saveHistory(productAfter, 'sale', amount, quantityBefore, productAfter.quantity, productPrice, totalAmount, productPurchasePrice, sessionId);
         }
         
         return productAfter || null;

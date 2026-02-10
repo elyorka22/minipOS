@@ -194,6 +194,65 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
+// API для работы с сессиями
+app.post('/api/sessions', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const session = await db.createSession();
+        res.status(201).json(session);
+    } catch (error) {
+        console.error('Ошибка создания сессии:', error);
+        res.status(500).json({ error: 'Ошибка создания сессии' });
+    }
+});
+
+app.get('/api/sessions/open', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const sessions = await db.getOpenSessions();
+        res.json(sessions);
+    } catch (error) {
+        console.error('Ошибка получения открытых сессий:', error);
+        res.status(500).json({ error: 'Ошибка получения открытых сессий' });
+    }
+});
+
+app.get('/api/sessions/:id', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const session = await db.getSessionById(req.params.id);
+        if (!session) {
+            return res.status(404).json({ error: 'Сессия не найдена' });
+        }
+        res.json(session);
+    } catch (error) {
+        console.error('Ошибка получения сессии:', error);
+        res.status(500).json({ error: 'Ошибка получения сессии' });
+    }
+});
+
+app.post('/api/sessions/:id/close', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const session = await db.closeSession(req.params.id);
+        if (!session) {
+            return res.status(404).json({ error: 'Сессия не найдена' });
+        }
+        res.json(session);
+    } catch (error) {
+        console.error('Ошибка закрытия сессии:', error);
+        res.status(500).json({ error: 'Ошибка закрытия сессии' });
+    }
+});
+
 // Продажа товара (уменьшить количество на 1)
 app.post('/api/products/:id/sell', async (req, res) => {
     try {
@@ -201,8 +260,8 @@ app.post('/api/products/:id/sell', async (req, res) => {
             return res.status(503).json({ error: 'База данных не инициализирована' });
         }
 
-        const { price, purchase_price } = req.body;
-        const product = await db.decreaseQuantity(req.params.id, 1, price || null, purchase_price || null);
+        const { price, purchase_price, session_id } = req.body;
+        const product = await db.decreaseQuantity(req.params.id, 1, price || null, purchase_price || null, session_id || null);
         
         if (!product) {
             return res.status(404).json({ error: 'Товар не найден' });
