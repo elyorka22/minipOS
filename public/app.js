@@ -1074,12 +1074,32 @@ async function editProduct(id) {
     }
     
     // Заполнить форму редактирования
-    document.getElementById('edit-product-id').value = product.id;
-    document.getElementById('edit-product-name').value = product.name;
-    document.getElementById('edit-product-barcode').value = product.barcode;
-    document.getElementById('edit-product-quantity').value = product.quantity;
-    document.getElementById('edit-product-price').value = product.price || 0;
-    document.getElementById('edit-product-purchase-price').value = product.purchase_price || 0;
+    const editIdEl = document.getElementById('edit-product-id');
+    const editNameEl = document.getElementById('edit-product-name');
+    const editBarcodeEl = document.getElementById('edit-product-barcode');
+    const editQuantityEl = document.getElementById('edit-product-quantity');
+    const editPriceEl = document.getElementById('edit-product-price');
+    const editPurchasePriceEl = document.getElementById('edit-product-purchase-price');
+    
+    if (!editIdEl || !editNameEl || !editBarcodeEl || !editQuantityEl || !editPriceEl || !editPurchasePriceEl) {
+        console.error('Не найдены элементы формы редактирования:', {
+            editIdEl: !!editIdEl,
+            editNameEl: !!editNameEl,
+            editBarcodeEl: !!editBarcodeEl,
+            editQuantityEl: !!editQuantityEl,
+            editPriceEl: !!editPriceEl,
+            editPurchasePriceEl: !!editPurchasePriceEl
+        });
+        showNotification('Ошибка: форма редактирования не найдена', 'error');
+        return;
+    }
+    
+    editIdEl.value = product.id;
+    editNameEl.value = product.name;
+    editBarcodeEl.value = product.barcode;
+    editQuantityEl.value = product.quantity;
+    editPriceEl.value = product.price || 0;
+    editPurchasePriceEl.value = product.purchase_price || 0;
     
     // Показать модальное окно
     document.getElementById('modal-edit-product').classList.remove('hidden');
