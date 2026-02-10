@@ -395,34 +395,13 @@ async function startScanner(readerId, onSuccess) {
             facingMode: "environment"
         };
         
-        // Обработчик успешного распознавания
+        // Обработчик успешного распознавания - максимально простой
         const onScanSuccess = (decodedText, decodedResult) => {
-            // Простая нормализация
-            const normalizedBarcode = String(decodedText).trim();
+            const barcode = String(decodedText).trim();
+            console.log('Штрих-код отсканирован:', barcode);
             
-            console.log('=== Штрих-код распознан ===');
-            console.log('Текст:', decodedText);
-            console.log('Нормализованный:', normalizedBarcode);
-            
-            // Минимальная проверка - только что код не пустой
-            if (!normalizedBarcode || normalizedBarcode.length < 3) {
-                console.warn('Штрих-код слишком короткий, пропускаем');
-                return;
-            }
-            
-            // Визуальная обратная связь при успешном сканировании
-            playSuccessSound();
-            vibrate([50, 30, 50]);
-            
-            console.log('Вызываем onSuccess с кодом:', normalizedBarcode);
-            
-            // Вызываем обработчик напрямую - debounce будет в handleSale/handleReceive
-            try {
-                onSuccess(normalizedBarcode);
-                console.log('✓ onSuccess вызван успешно');
-            } catch (error) {
-                console.error('Ошибка в onSuccess:', error);
-            }
+            // Просто вызываем обработчик - все проверки в handleSale/handleReceive
+            onSuccess(barcode);
         };
         
         // Обработчик ошибок сканирования
