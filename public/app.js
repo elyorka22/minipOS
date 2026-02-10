@@ -218,32 +218,28 @@ function switchView(viewName) {
 
 // Добавить товар в корзину продажи
 function addToSaleCart(product) {
-    // Обновить информацию о товаре (на случай изменения остатка)
-    const existingItemIndex = saleCart.findIndex(item => item.id === product.id);
+    // Проверить, есть ли товар уже в корзине
+    const existingItem = saleCart.find(item => item.id === product.id);
     
-    if (existingItemIndex !== -1) {
-        // Товар уже в корзине - обновить информацию и увеличить количество
-        const existingItem = saleCart[existingItemIndex];
+    if (existingItem) {
+        // Товар уже в корзине - обновить информацию об остатке и показать сообщение
         existingItem.quantity = product.quantity; // Обновить остаток
         existingItem.name = product.name;
-        
-        if (existingItem.quantityInCart < product.quantity) {
-            existingItem.quantityInCart += 1;
-        } else {
-            showNotification('Недостаточно товара на складе', 'error');
-            return;
-        }
-    } else {
-        // Добавить новый товар
-        if (product.quantity <= 0) {
-            showNotification('Товар закончился на складе', 'error');
-            return;
-        }
-        saleCart.push({
-            ...product,
-            quantityInCart: 1
-        });
+        renderSaleCart();
+        showNotification(`Товар "${product.name}" уже есть в корзине. Используйте кнопки +/- для изменения количества.`, 'error');
+        return;
     }
+    
+    // Добавить новый товар
+    if (product.quantity <= 0) {
+        showNotification('Товар закончился на складе', 'error');
+        return;
+    }
+    
+    saleCart.push({
+        ...product,
+        quantityInCart: 1
+    });
     
     renderSaleCart();
     showNotification(`${product.name} добавлен в корзину`, 'success');
