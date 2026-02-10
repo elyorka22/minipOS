@@ -39,30 +39,50 @@ async function initDatabase() {
 
         // Добавить поле price если его нет (для существующих БД)
         try {
-            await pool.query(`
-                ALTER TABLE products 
-                ADD COLUMN IF NOT EXISTS price DECIMAL(10, 2) NOT NULL DEFAULT 0
+            const priceCheck = await pool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'products' 
+                AND column_name = 'price'
             `);
-            console.log('Поле price добавлено/проверено');
-        } catch (error) {
-            // Игнорируем ошибку если колонка уже существует
-            if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
-                console.warn('Предупреждение при добавлении поля price:', error.message);
+            
+            if (priceCheck.rows.length === 0) {
+                await pool.query(`
+                    ALTER TABLE products 
+                    ADD COLUMN price DECIMAL(10, 2) NOT NULL DEFAULT 0
+                `);
+                console.log('✓ Поле price добавлено');
+            } else {
+                console.log('✓ Поле price уже существует');
             }
+        } catch (error) {
+            console.error('Ошибка при проверке/добавлении поля price:', error.message);
+            // Продолжаем работу, даже если не удалось добавить поле
         }
 
         // Добавить поле purchase_price если его нет (для существующих БД)
         try {
-            await pool.query(`
-                ALTER TABLE products 
-                ADD COLUMN IF NOT EXISTS purchase_price DECIMAL(10, 2) NOT NULL DEFAULT 0
+            const purchasePriceCheck = await pool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'products' 
+                AND column_name = 'purchase_price'
             `);
-            console.log('Поле purchase_price добавлено/проверено');
-        } catch (error) {
-            // Игнорируем ошибку если колонка уже существует
-            if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
-                console.warn('Предупреждение при добавлении поля purchase_price:', error.message);
+            
+            if (purchasePriceCheck.rows.length === 0) {
+                await pool.query(`
+                    ALTER TABLE products 
+                    ADD COLUMN purchase_price DECIMAL(10, 2) NOT NULL DEFAULT 0
+                `);
+                console.log('✓ Поле purchase_price добавлено');
+            } else {
+                console.log('✓ Поле purchase_price уже существует');
             }
+        } catch (error) {
+            console.error('Ошибка при проверке/добавлении поля purchase_price:', error.message);
+            // Продолжаем работу, даже если не удалось добавить поле
         }
 
         // Создать таблицу истории операций
