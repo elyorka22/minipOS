@@ -9,15 +9,25 @@ const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC
 
 const pool = new Pool({
     connectionString: connectionString,
-    ssl: connectionString ? { rejectUnauthorized: false } : false
+    ssl: connectionString ? { rejectUnauthorized: false } : false,
+    connectionTimeoutMillis: 10000, // 10 секунд на подключение
+    query_timeout: 30000, // 30 секунд на запрос
+    statement_timeout: 30000 // 30 секунд на выполнение запроса
 });
 
 // Инициализация БД - создание таблицы если её нет
 async function initDatabase() {
+    const startTime = Date.now();
+    console.log('Начало инициализации базы данных...');
+    
     try {
-        // Проверка подключения
-        await pool.query('SELECT 1');
-        console.log('Подключение к PostgreSQL установлено');
+        // Проверка подключения с таймаутом
+        const connectionStart = Date.now();
+        await Promise.race([
+            pool.query('SELECT 1'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Таймаут подключения')), 10000))
+        ]);
+        console.log(`Подключение к PostgreSQL установлено (${Date.now() - connectionStart}ms)`);
         
         // Убедимся, что используем правильную схему (public по умолчанию)
         await pool.query('SET search_path TO public');
@@ -157,16 +167,18 @@ async function initDatabase() {
                 ADD COLUMN IF NOT EXISTS total_amount DECIMAL(10, 2) DEFAULT 0
             `);
             
-            // Добавить поле purchase_price если его нет
-            const purchasePriceCheck = await pool.query(`
+            // Оптимизированная проверка всех полей history за один запрос
+            const historyColumnsCheck = await pool.query(`
                 SELECT column_name 
                 FROM information_schema.columns 
                 WHERE table_schema = 'public' 
                 AND table_name = 'history' 
-                AND column_name = 'purchase_price'
+                AND column_name IN ('purchase_price', 'profit', 'session_id')
             `);
             
-            if (purchasePriceCheck.rows.length === 0) {
+            const existingHistoryColumns = historyColumnsCheck.rows.map(row => row.column_name);
+            
+            if (!existingHistoryColumns.includes('purchase_price')) {
                 await pool.query(`
                     ALTER TABLE history 
                     ADD COLUMN purchase_price DECIMAL(10, 2) DEFAULT 0
@@ -174,16 +186,7 @@ async function initDatabase() {
                 console.log('✓ Поле purchase_price добавлено в history');
             }
             
-            // Добавить поле profit если его нет
-            const profitCheck = await pool.query(`
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                AND table_name = 'history' 
-                AND column_name = 'profit'
-            `);
-            
-            if (profitCheck.rows.length === 0) {
+            if (!existingHistoryColumns.includes('profit')) {
                 await pool.query(`
                     ALTER TABLE history 
                     ADD COLUMN profit DECIMAL(10, 2) DEFAULT 0
@@ -191,16 +194,7 @@ async function initDatabase() {
                 console.log('✓ Поле profit добавлено в history');
             }
             
-            // Добавить поле session_id если его нет
-            const sessionIdCheck = await pool.query(`
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                AND table_name = 'history' 
-                AND column_name = 'session_id'
-            `);
-            
-            if (sessionIdCheck.rows.length === 0) {
+            if (!existingHistoryColumns.includes('session_id')) {
                 await pool.query(`
                     ALTER TABLE history 
                     ADD COLUMN session_id INTEGER
@@ -244,6 +238,9 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)
         `);
         console.log('Индекс idx_products_barcode создан/проверен');
+        
+        const totalTime = Date.now() - startTime;
+        console.log(`✓ Инициализация базы данных завершена за ${totalTime}ms`);
         
         // Проверить, что таблица существует
         const result = await pool.query(`
