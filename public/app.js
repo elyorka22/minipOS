@@ -621,10 +621,8 @@ function renderSaleCart() {
         <div class="cart-item" data-item-id="${item.id}" data-item-index="${index}">
             <div class="cart-item-info">
                 <div class="cart-item-name">${escapeHtml(item.name)}</div>
-                <div class="cart-item-barcode">${escapeHtml(item.barcode)}</div>
                 <div class="cart-item-details">
-                    <span class="cart-item-stock">Остаток: ${item.quantity}</span>
-                    ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} ₽ × ${item.quantityInCart} = ${itemTotal.toFixed(2)} ₽</span>` : ''}
+                    ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} ₽ × ${item.quantityInCart} = <strong>${itemTotal.toFixed(2)} ₽</strong></span>` : '<span class="cart-item-price">Цена не указана</span>'}
                     ${itemProfit > 0 ? `<span class="cart-item-profit">Прибыль: ${itemProfit.toFixed(2)} ₽</span>` : ''}
                 </div>
             </div>
