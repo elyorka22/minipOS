@@ -868,6 +868,7 @@ module.exports = {
     getStats,
     createSession,
     getOpenSessions,
+    getAllSessions,
     getSessionById,
     getSessionSales,
     saveSessionItem,
