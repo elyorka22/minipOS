@@ -1352,8 +1352,7 @@ function showSessionsSelector() {
     document.getElementById('sale-scanner-section').classList.add('hidden');
     document.getElementById('sale-cart').classList.add('hidden');
     document.getElementById('btn-clear-cart').style.display = 'none';
-    document.getElementById('btn-close-session').style.display = 'none';
-    document.getElementById('current-session-info').style.display = 'none';
+    document.getElementById('btn-back-to-sessions').style.display = 'none';
     if (currentScanner) {
         stopScanner();
     }
@@ -1363,14 +1362,36 @@ function showSaleInterface() {
     document.getElementById('sessions-selector').classList.add('hidden');
     document.getElementById('sale-scanner-section').classList.remove('hidden');
     document.getElementById('sale-cart').classList.remove('hidden');
-    document.getElementById('btn-close-session').style.display = 'block';
-    document.getElementById('current-session-info').style.display = 'block';
-    document.getElementById('current-session-number').textContent = currentSessionNumber;
+    document.getElementById('btn-back-to-sessions').style.display = 'block';
+    document.getElementById('btn-clear-cart').style.display = saleCart.length > 0 ? 'block' : 'none';
     
     // Запустить сканер
     setTimeout(() => {
         startScanner('reader-sale', handleSale);
     }, 300);
+}
+
+async function closeSessionAndReturn() {
+    if (!currentSessionId) {
+        showSessionsSelector();
+        return;
+    }
+    
+    try {
+        await apiRequest(`/sessions/${currentSessionId}/close`, {
+            method: 'POST'
+        });
+        showNotification(`Сессия ${currentSessionNumber} закрыта`, 'success');
+        currentSessionId = null;
+        currentSessionNumber = null;
+        saleCart = [];
+        renderSaleCart();
+        await loadOpenSessions();
+        showSessionsSelector();
+    } catch (error) {
+        console.error('Ошибка закрытия сессии:', error);
+        showNotification('Ошибка закрытия сессии', 'error');
+    }
 }
 
 // Загрузка статистики
