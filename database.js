@@ -327,10 +327,6 @@ async function deleteProduct(id) {
     }
 }
 
-// Сохранить операцию в историю (старая версия для обратной совместимости)
-async function saveHistoryOld(product, operationType, quantity, quantityBefore, quantityAfter, price = null, totalAmount = null, purchasePrice = null) {
-    return saveHistory(product, operationType, quantity, quantityBefore, quantityAfter, price, totalAmount, purchasePrice, null);
-}
 
 // Увеличить количество товара
 async function increaseQuantity(id, amount) {
