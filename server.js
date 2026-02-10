@@ -199,7 +199,8 @@ app.post('/api/products/:id/sell', async (req, res) => {
             return res.status(503).json({ error: 'База данных не инициализирована' });
         }
 
-        const product = await db.decreaseQuantity(req.params.id, 1);
+        const { price } = req.body;
+        const product = await db.decreaseQuantity(req.params.id, 1, price || null);
         
         if (!product) {
             return res.status(404).json({ error: 'Товар не найден' });
