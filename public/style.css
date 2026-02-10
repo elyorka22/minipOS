@@ -711,6 +711,39 @@ body {
     padding: 0 1rem;
 }
 
+/* Статистика склада */
+.warehouse-stats {
+    display: flex;
+    gap: 1rem;
+    padding: 0 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.warehouse-stat-card {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: 12px;
+    border-left: 4px solid var(--accent);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.warehouse-stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.warehouse-stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--accent);
+}
+
 .search-input {
     width: 100%;
     padding: 0.75rem 1rem;

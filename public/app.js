@@ -1108,13 +1108,18 @@ async function renderWarehouse(filteredProducts = null) {
         if (!Array.isArray(products)) {
             console.error('loadProducts вернул не массив:', products);
             list.innerHTML = '<div class="warehouse-empty">Ошибка: неверный формат данных</div>';
+            updateWarehouseStats([]);
             return;
         }
     
     if (products.length === 0) {
         list.innerHTML = '<div class="warehouse-empty">Склад пуст. Добавьте товары.</div>';
+        updateWarehouseStats([]);
         return;
     }
+
+        // Обновить статистику перед отображением товаров
+        updateWarehouseStats(products);
 
         list.innerHTML = products.map(product => {
             // Безопасная обработка цен (может быть null, undefined, или строка)
@@ -1149,6 +1154,7 @@ async function renderWarehouse(filteredProducts = null) {
             name: error.name
         });
         list.innerHTML = `<div class="warehouse-empty">Ошибка загрузки склада: ${error.message || 'Неизвестная ошибка'}</div>`;
+        updateWarehouseStats([]);
     }
 }
 
@@ -1246,6 +1252,36 @@ async function deleteProductConfirm(id) {
     if (confirm(`Удалить товар "${product.name}"?`)) {
         await deleteProduct(id);
     }
+}
+
+// Обновить статистику склада
+function updateWarehouseStats(products) {
+    const totalValueEl = document.getElementById('warehouse-total-value');
+    const totalProfitEl = document.getElementById('warehouse-total-profit');
+    
+    if (!totalValueEl || !totalProfitEl) {
+        return; // Элементы могут быть не найдены, если мы не на вкладке склада
+    }
+    
+    let totalValue = 0;
+    let totalProfit = 0;
+    
+    products.forEach(product => {
+        const price = parseFloat(product.price) || 0;
+        const purchasePrice = parseFloat(product.purchase_price) || 0;
+        const quantity = parseInt(product.quantity) || 0;
+        
+        // Общая стоимость = цена продажи * количество
+        totalValue += price * quantity;
+        
+        // Общая прибыль = (цена продажи - цена закупки) * количество
+        if (price > 0 && purchasePrice > 0) {
+            totalProfit += (price - purchasePrice) * quantity;
+        }
+    });
+    
+    totalValueEl.textContent = `${totalValue.toFixed(2)} сум`;
+    totalProfitEl.textContent = `${totalProfit.toFixed(2)} сум`;
 }
 
 // Поиск товаров
