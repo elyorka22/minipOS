@@ -832,22 +832,60 @@ async function handleProductInfo(barcode) {
 
 // Открыть модальное окно приема товара
 function openReceiveModal(product = null) {
+    const modal = document.getElementById('modal-receive-product');
+    const scannerContainer = document.getElementById('receive-scanner-container');
+    const productInfo = document.getElementById('receive-product-info');
+    const submitBtn = document.getElementById('btn-submit-receive');
+    
     if (product) {
         // Если товар передан, заполнить форму
         document.getElementById('receive-product-id').value = product.id;
         document.getElementById('receive-product-name').textContent = product.name;
         document.getElementById('receive-product-barcode').textContent = product.barcode;
         document.getElementById('receive-product-stock').textContent = product.quantity;
+        scannerContainer.classList.add('hidden');
+        productInfo.classList.remove('hidden');
+        submitBtn.disabled = false;
     } else {
         // Если товар не передан, нужно будет сканировать
         document.getElementById('receive-product-id').value = '';
-        document.getElementById('receive-product-name').textContent = 'Отсканируйте штрих-код';
+        document.getElementById('receive-product-name').textContent = 'Отсканируйте штрих-код товара';
         document.getElementById('receive-product-barcode').textContent = '-';
         document.getElementById('receive-product-stock').textContent = '-';
+        scannerContainer.classList.add('hidden');
+        productInfo.classList.remove('hidden');
+        submitBtn.disabled = true;
     }
     
     document.getElementById('receive-product-quantity').value = 1;
-    document.getElementById('modal-receive-product').classList.remove('hidden');
+    modal.classList.remove('hidden');
+}
+
+// Обработка сканирования в модальном окне приема
+async function handleReceiveModalScan(barcode) {
+    const product = await findProductByBarcode(barcode, 2);
+    
+    if (!product) {
+        showNotification('Товар не найден. Попробуйте отсканировать еще раз или добавьте в склад.', 'error');
+        return;
+    }
+    
+    // Заполнить форму данными товара
+    document.getElementById('receive-product-id').value = product.id;
+    document.getElementById('receive-product-name').textContent = product.name;
+    document.getElementById('receive-product-barcode').textContent = product.barcode;
+    document.getElementById('receive-product-stock').textContent = product.quantity;
+    
+    // Скрыть сканер и показать информацию
+    document.getElementById('receive-scanner-container').classList.add('hidden');
+    document.getElementById('receive-product-info').classList.remove('hidden');
+    document.getElementById('btn-submit-receive').disabled = false;
+    
+    // Остановить сканер
+    await stopScanner();
+    
+    playSuccessSound();
+    vibrate([50]);
 }
 
 // Подтверждение приема

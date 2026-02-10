@@ -199,10 +199,15 @@
                     <h2>Принять товар</h2>
                     <button id="modal-receive-close" class="modal-close">×</button>
                 </div>
+                <div id="receive-scanner-container" class="scanner-container-small hidden">
+                    <div id="reader-receive-modal"></div>
+                    <button id="scanner-receive-close" class="btn-secondary">Закрыть сканер</button>
+                </div>
                 <div id="receive-product-info" class="receive-product-info">
-                    <h3 id="receive-product-name"></h3>
-                    <div class="receive-product-barcode">Штрих-код: <span id="receive-product-barcode"></span></div>
-                    <div class="receive-product-stock">Текущий остаток: <span id="receive-product-stock"></span></div>
+                    <h3 id="receive-product-name">Отсканируйте штрих-код товара</h3>
+                    <div class="receive-product-barcode">Штрих-код: <span id="receive-product-barcode">-</span></div>
+                    <div class="receive-product-stock">Текущий остаток: <span id="receive-product-stock">-</span></div>
+                    <button id="btn-scan-receive" class="btn-secondary" style="margin-top: 0.5rem;">Сканировать штрих-код</button>
                 </div>
                 <form id="form-receive-product">
                     <input type="hidden" id="receive-product-id">
@@ -211,7 +216,7 @@
                         <input type="number" id="receive-product-quantity" min="1" value="1" class="input-field" required>
                     </label>
                     <div class="modal-actions">
-                        <button type="submit" class="btn-primary">Принять товар</button>
+                        <button type="submit" class="btn-primary" id="btn-submit-receive" disabled>Принять товар</button>
                         <button type="button" id="form-receive-cancel" class="btn-secondary">Отмена</button>
                     </div>
                 </form>
