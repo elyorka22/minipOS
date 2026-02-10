@@ -672,14 +672,14 @@ function renderSaleCart() {
     
     // Подсчитать общую прибыль
     const totalProfit = saleCart.reduce((sum, item) => {
-        const price = item.price || 0;
-        const purchasePrice = item.purchase_price || 0;
-        return sum + ((price - purchasePrice) * item.quantityInCart);
+        const price = parseFloat(item.price) || 0;
+        const purchasePrice = parseFloat(item.purchase_price) || 0;
+        const quantityInCart = parseInt(item.quantityInCart) || 1;
+        return sum + ((price - purchasePrice) * quantityInCart);
     }, 0);
     
     // Обновить итоговую сумму в футере
-    const cartTotalCount = saleCart.reduce((sum, item) => sum + item.quantityInCart, 0);
-    const totalCountEl = document.getElementById('cart-total-count');
+    const cartTotalCount = saleCart.reduce((sum, item) => sum + (parseInt(item.quantityInCart) || 0), 0);
     if (totalCountEl) {
         if (totalAmount > 0) {
             let summaryText = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
