@@ -15,9 +15,6 @@ let saleCart = [];
 // Текущая активная сессия
 let currentSessionId = null;
 let currentSessionNumber = null;
-// Текущая активная сессия
-let currentSessionId = null;
-let currentSessionNumber = null;
 
 // Защита от повторных сканирований одного штрих-кода
 let lastScannedBarcode = null;
