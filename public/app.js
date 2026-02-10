@@ -667,23 +667,11 @@ function renderSaleCart() {
         cartItems.innerHTML = '<div class="warehouse-empty">Ошибка отображения товаров</div>';
     }
     
-    // Подсчитать общую прибыль
-    const totalProfit = saleCart.reduce((sum, item) => {
-        const price = parseFloat(item.price) || 0;
-        const purchasePrice = parseFloat(item.purchase_price) || 0;
-        const quantityInCart = parseInt(item.quantityInCart) || 1;
-        return sum + ((price - purchasePrice) * quantityInCart);
-    }, 0);
-    
     // Обновить итоговую сумму в футере
     const cartTotalCount = saleCart.reduce((sum, item) => sum + (parseInt(item.quantityInCart) || 0), 0);
     if (totalCountEl) {
         if (totalAmount > 0) {
-            let summaryText = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
-            if (totalProfit > 0) {
-                summaryText += `<br>Прибыль: <strong style="color: var(--success);">${totalProfit.toFixed(2)} ₽</strong>`;
-            }
-            totalCountEl.innerHTML = summaryText;
+            totalCountEl.innerHTML = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
         } else {
             totalCountEl.textContent = cartTotalCount;
         }
