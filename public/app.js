@@ -1664,9 +1664,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Запустить сканер для продажи и приема
             if (view === 'sale') {
-                setTimeout(() => {
-                    startScanner('reader-sale', handleSale);
-                }, 300);
+                // Показать селектор сессий или интерфейс продажи
+                if (currentSessionId) {
+                    showSaleInterface();
+                } else {
+                    showSessionsSelector();
+                }
+                // Сканер запустится автоматически в showSaleInterface, если есть активная сессия
             } else if (view === 'product-info') {
                 setTimeout(() => {
                     startScanner('reader-product-info', handleProductInfo);
