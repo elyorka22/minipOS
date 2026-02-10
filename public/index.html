@@ -41,9 +41,9 @@
                 <span class="btn-icon">💰</span>
                 <span class="btn-text">Продажа</span>
             </button>
-            <button id="btn-receive" class="nav-btn" data-view="receive">
-                <span class="btn-icon">📦</span>
-                <span class="btn-text">Принять</span>
+            <button id="btn-product-info" class="nav-btn" data-view="product-info">
+                <span class="btn-icon">ℹ️</span>
+                <span class="btn-text">О товаре</span>
             </button>
             <button id="btn-warehouse" class="nav-btn" data-view="warehouse">
                 <span class="btn-icon">📋</span>
@@ -89,26 +89,41 @@
             </div>
         </div>
 
-        <!-- Экран приема товара -->
-        <div id="view-receive" class="view">
+        <!-- Экран информации о товаре -->
+        <div id="view-product-info" class="view">
             <div class="view-header">
-                <h1>Принять товар</h1>
+                <h1>Информация о товаре</h1>
             </div>
-            <div id="scanner-container-receive" class="scanner-container">
-                <div id="reader-receive"></div>
+            <div id="scanner-container-product-info" class="scanner-container">
+                <div id="reader-product-info"></div>
                 <div class="scanner-overlay">
                     <div class="scanner-frame"></div>
                     <p class="scanner-hint">Наведите камеру на штрих-код</p>
                 </div>
             </div>
-            <div id="receive-form" class="form-panel hidden">
-                <h3 id="receive-product-name"></h3>
-                <label>
-                    Количество:
-                    <input type="number" id="receive-quantity" min="1" value="1" class="input-field">
-                </label>
-                <button id="receive-confirm" class="btn-primary">Принять товар</button>
-                <button id="receive-cancel" class="btn-secondary">Отмена</button>
+            <div id="product-info-panel" class="product-info-panel hidden">
+                <div class="product-info-header">
+                    <h2 id="product-info-name"></h2>
+                    <div class="product-info-barcode">Штрих-код: <span id="product-info-barcode"></span></div>
+                </div>
+                <div class="product-info-details">
+                    <div class="info-item">
+                        <span class="info-label">Остаток на складе:</span>
+                        <span class="info-value" id="product-info-quantity"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Дата добавления:</span>
+                        <span class="info-value" id="product-info-created"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Последнее обновление:</span>
+                        <span class="info-value" id="product-info-updated"></span>
+                    </div>
+                </div>
+                <div class="product-info-actions">
+                    <button id="btn-edit-from-info" class="btn-primary">Редактировать</button>
+                    <button id="btn-receive-from-info" class="btn-secondary">Принять товар</button>
+                </div>
             </div>
         </div>
 
@@ -116,7 +131,10 @@
         <div id="view-warehouse" class="view">
             <div class="view-header">
                 <h1>Склад</h1>
-                <button id="btn-add-product" class="btn-primary">+ Добавить товар</button>
+                <div class="header-actions">
+                    <button id="btn-receive-product" class="btn-secondary">📦 Принять</button>
+                    <button id="btn-add-product" class="btn-primary">+ Добавить товар</button>
+                </div>
             </div>
             <div class="search-container">
                 <input type="text" id="warehouse-search" class="search-input" placeholder="Поиск по названию или штрих-коду...">
@@ -171,6 +189,32 @@
             </div>
             <div id="history-list" class="history-list">
                 <!-- Список операций будет здесь -->
+            </div>
+        </div>
+
+        <!-- Модальное окно приема товара -->
+        <div id="modal-receive-product" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Принять товар</h2>
+                    <button id="modal-receive-close" class="modal-close">×</button>
+                </div>
+                <div id="receive-product-info" class="receive-product-info">
+                    <h3 id="receive-product-name"></h3>
+                    <div class="receive-product-barcode">Штрих-код: <span id="receive-product-barcode"></span></div>
+                    <div class="receive-product-stock">Текущий остаток: <span id="receive-product-stock"></span></div>
+                </div>
+                <form id="form-receive-product">
+                    <input type="hidden" id="receive-product-id">
+                    <label>
+                        Количество для приема:
+                        <input type="number" id="receive-product-quantity" min="1" value="1" class="input-field" required>
+                    </label>
+                    <div class="modal-actions">
+                        <button type="submit" class="btn-primary">Принять товар</button>
+                        <button type="button" id="form-receive-cancel" class="btn-secondary">Отмена</button>
+                    </div>
+                </form>
             </div>
         </div>
 

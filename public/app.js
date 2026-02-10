@@ -770,8 +770,8 @@ function clearSaleCart() {
 window.updateCartItemQuantity = updateCartItemQuantity;
 window.removeFromSaleCart = removeFromSaleCart;
 
-// Прием товара
-async function handleReceive(barcode) {
+// Информация о товаре (новая функция для вкладки "О товаре")
+async function handleProductInfo(barcode) {
     // Валидация штрих-кода перед обработкой
     const validation = validateBarcode(barcode);
     if (!validation.valid) {
@@ -794,16 +794,60 @@ async function handleReceive(barcode) {
     
     if (!product) {
         showNotification('Товар не найден. Попробуйте отсканировать еще раз или добавьте в склад.', 'error');
+        document.getElementById('product-info-panel').classList.add('hidden');
         return;
     }
 
-    currentProduct = product;
-    currentBarcode = barcode;
+    // Показать информацию о товаре
+    document.getElementById('product-info-name').textContent = product.name;
+    document.getElementById('product-info-barcode').textContent = product.barcode;
+    document.getElementById('product-info-quantity').textContent = product.quantity;
+    
+    // Форматирование дат
+    if (product.created_at) {
+        const createdDate = new Date(product.created_at);
+        document.getElementById('product-info-created').textContent = createdDate.toLocaleString('ru-RU');
+    } else {
+        document.getElementById('product-info-created').textContent = 'Не указана';
+    }
+    
+    if (product.updated_at) {
+        const updatedDate = new Date(product.updated_at);
+        document.getElementById('product-info-updated').textContent = updatedDate.toLocaleString('ru-RU');
+    } else {
+        document.getElementById('product-info-updated').textContent = 'Не указана';
+    }
+    
+    // Сохранить ID товара для кнопок действий
+    document.getElementById('product-info-panel').dataset.productId = product.id;
+    document.getElementById('product-info-panel').dataset.product = JSON.stringify(product);
+    
+    // Показать панель информации
+    document.getElementById('product-info-panel').classList.remove('hidden');
+    
+    // Звук и вибрация
+    playSuccessSound();
+    vibrate([50]);
+}
 
-    // Показать форму
-    document.getElementById('receive-product-name').textContent = product.name;
-    document.getElementById('receive-quantity').value = 1;
-    document.getElementById('receive-form').classList.remove('hidden');
+// Открыть модальное окно приема товара
+function openReceiveModal(product = null) {
+    if (product) {
+        // Если товар передан, заполнить форму
+        document.getElementById('receive-product-id').value = product.id;
+        document.getElementById('receive-product-name').textContent = product.name;
+        document.getElementById('receive-product-barcode').textContent = product.barcode;
+        document.getElementById('receive-product-stock').textContent = product.quantity;
+    } else {
+        // Если товар не передан, нужно будет сканировать
+        document.getElementById('receive-product-id').value = '';
+        document.getElementById('receive-product-name').textContent = 'Отсканируйте штрих-код';
+        document.getElementById('receive-product-barcode').textContent = '-';
+        document.getElementById('receive-product-stock').textContent = '-';
+    }
+    
+    document.getElementById('receive-product-quantity').value = 1;
+    document.getElementById('modal-receive-product').classList.remove('hidden');
 }
 
 // Подтверждение приема
@@ -1069,9 +1113,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 setTimeout(() => {
                     startScanner('reader-sale', handleSale);
                 }, 300);
-            } else if (view === 'receive') {
+            } else if (view === 'product-info') {
                 setTimeout(() => {
-                    startScanner('reader-receive', handleReceive);
+                    startScanner('reader-product-info', handleProductInfo);
                 }, 300);
             } else if (view === 'warehouse') {
                 // Обновить склад при открытии
@@ -1104,22 +1148,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Прием
-    document.getElementById('receive-confirm').addEventListener('click', async () => {
-        await confirmReceive();
-        // Перезапустить сканер
-        setTimeout(() => {
-            startScanner('reader-receive', handleReceive);
-        }, 300);
+    // Кнопка "Принять" на экране склада
+    document.getElementById('btn-receive-product').addEventListener('click', () => {
+        openReceiveModal();
     });
 
-    document.getElementById('receive-cancel').addEventListener('click', () => {
-        document.getElementById('receive-form').classList.add('hidden');
-        currentProduct = null;
-        currentBarcode = null;
-        setTimeout(() => {
-            startScanner('reader-receive', handleReceive);
-        }, 300);
+    // Модальное окно приема товара
+    document.getElementById('modal-receive-close').addEventListener('click', () => {
+        document.getElementById('modal-receive-product').classList.add('hidden');
+    });
+
+    document.getElementById('form-receive-cancel').addEventListener('click', () => {
+        document.getElementById('modal-receive-product').classList.add('hidden');
+    });
+
+    // Форма приема товара
+    document.getElementById('form-receive-product').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await confirmReceiveFromModal();
+    });
+
+    // Кнопки на экране информации о товаре
+    document.getElementById('btn-edit-from-info').addEventListener('click', () => {
+        const productId = document.getElementById('product-info-panel').dataset.productId;
+        if (productId) {
+            editProduct(productId);
+        }
+    });
+
+    document.getElementById('btn-receive-from-info').addEventListener('click', () => {
+        const productJson = document.getElementById('product-info-panel').dataset.product;
+        if (productJson) {
+            const product = JSON.parse(productJson);
+            openReceiveModal(product);
+        }
     });
 
     // Добавление товара
@@ -1249,9 +1311,9 @@ document.addEventListener('visibilitychange', () => {
                 setTimeout(() => {
                     startScanner('reader-sale', handleSale);
                 }, 300);
-            } else if (viewId === 'view-receive') {
+            } else if (viewId === 'view-product-info') {
                 setTimeout(() => {
-                    startScanner('reader-receive', handleReceive);
+                    startScanner('reader-product-info', handleProductInfo);
                 }, 300);
             }
         }
