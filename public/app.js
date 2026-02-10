@@ -366,7 +366,7 @@ async function startScanner(readerId, onSuccess) {
         }
         
         console.log('Библиотека html5-qrcode загружена, версия:', Html5Qrcode?.version || 'неизвестна');
-        
+
         const config = {
             fps: 30, // Увеличена частота кадров для лучшего распознавания
             qrbox: { width: qrboxSize, height: qrboxSize }, // Адаптивный размер области сканирования
@@ -529,13 +529,13 @@ function addToSaleCart(product) {
         showNotification(`Товар "${product.name}" уже есть в корзине. Используйте кнопки +/- для изменения количества.`, 'error');
         return;
     }
-    
+
     // Добавить новый товар
     if (product.quantity <= 0) {
         showNotification('Товар закончился на складе', 'error');
         return;
     }
-    
+
     saleCart.push({
         ...product,
         quantityInCart: 1
@@ -597,53 +597,78 @@ function renderSaleCart() {
     const cartFooter = document.getElementById('sale-cart-footer');
     const clearBtn = document.getElementById('btn-clear-cart');
     
+    // Проверка существования элементов
+    if (!cartItems || !cartEmpty || !cartFooter) {
+        console.error('Элементы корзины не найдены в DOM:', {
+            cartItems: !!cartItems,
+            cartEmpty: !!cartEmpty,
+            cartFooter: !!cartFooter
+        });
+        return;
+    }
+    
+    console.log('renderSaleCart вызван, товаров в корзине:', saleCart.length);
+    
     if (saleCart.length === 0) {
         cartItems.classList.add('hidden');
         cartEmpty.classList.remove('hidden');
         cartFooter.classList.add('hidden');
-        clearBtn.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
         return;
     }
     
     cartItems.classList.remove('hidden');
     cartEmpty.classList.add('hidden');
     cartFooter.classList.remove('hidden');
-    clearBtn.style.display = 'block';
+    if (clearBtn) clearBtn.style.display = 'block';
     
     // Подсчитать общее количество
-    const totalCount = saleCart.reduce((sum, item) => sum + item.quantityInCart, 0);
-    document.getElementById('cart-total-count').textContent = totalCount;
+    const totalCount = saleCart.reduce((sum, item) => sum + (parseInt(item.quantityInCart) || 0), 0);
+    const totalCountEl = document.getElementById('cart-total-count');
+    if (totalCountEl) {
+        totalCountEl.textContent = totalCount;
+    }
     
     // Подсчитать общую сумму
     const totalAmount = saleCart.reduce((sum, item) => {
-        const price = item.price || 0;
-        return sum + (price * item.quantityInCart);
+        const price = parseFloat(item.price) || 0;
+        const quantityInCart = parseInt(item.quantityInCart) || 1;
+        return sum + (price * quantityInCart);
     }, 0);
     
     // Отобразить товары
-    cartItems.innerHTML = saleCart.map((item, index) => {
-        const price = item.price || 0;
-        const purchasePrice = item.purchase_price || 0;
-        const itemTotal = price * item.quantityInCart;
-        const itemProfit = (price - purchasePrice) * item.quantityInCart;
-        return `
-        <div class="cart-item" data-item-id="${item.id}" data-item-index="${index}">
-            <div class="cart-item-info">
-                <div class="cart-item-name">${escapeHtml(item.name)}</div>
-                <div class="cart-item-details">
-                    ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} ₽ × ${item.quantityInCart} = <strong>${itemTotal.toFixed(2)} ₽</strong></span>` : '<span class="cart-item-price">Цена не указана</span>'}
-                    ${itemProfit > 0 ? `<span class="cart-item-profit">Прибыль: ${itemProfit.toFixed(2)} ₽</span>` : ''}
+    try {
+        cartItems.innerHTML = saleCart.map((item, index) => {
+            // Безопасная обработка данных товара
+            const price = parseFloat(item.price) || 0;
+            const purchasePrice = parseFloat(item.purchase_price) || 0;
+            const quantityInCart = parseInt(item.quantityInCart) || 1;
+            const itemTotal = price * quantityInCart;
+            const itemProfit = (price - purchasePrice) * quantityInCart;
+            
+            return `
+            <div class="cart-item" data-item-id="${item.id}" data-item-index="${index}">
+                <div class="cart-item-info">
+                    <div class="cart-item-name">${escapeHtml(item.name || 'Без названия')}</div>
+                    <div class="cart-item-details">
+                        ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} ₽ × ${quantityInCart} = <strong>${itemTotal.toFixed(2)} ₽</strong></span>` : '<span class="cart-item-price">Цена не указана</span>'}
+                        ${itemProfit > 0 ? `<span class="cart-item-profit">Прибыль: ${itemProfit.toFixed(2)} ₽</span>` : ''}
+                    </div>
+                </div>
+                <div class="cart-item-controls">
+                    <button class="btn-quantity" onclick="updateCartItemQuantity('${item.id}', -1)">−</button>
+                    <span class="cart-item-quantity">${quantityInCart}</span>
+                    <button class="btn-quantity" onclick="updateCartItemQuantity('${item.id}', 1)">+</button>
+                    <button class="btn-remove" onclick="removeFromSaleCart('${item.id}')" title="Удалить">×</button>
                 </div>
             </div>
-            <div class="cart-item-controls">
-                <button class="btn-quantity" onclick="updateCartItemQuantity('${item.id}', -1)">−</button>
-                <span class="cart-item-quantity">${item.quantityInCart}</span>
-                <button class="btn-quantity" onclick="updateCartItemQuantity('${item.id}', 1)">+</button>
-                <button class="btn-remove" onclick="removeFromSaleCart('${item.id}')" title="Удалить">×</button>
-            </div>
-        </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+        console.log('Товары отображены в корзине:', saleCart.length);
+    } catch (error) {
+        console.error('Ошибка при отображении товаров в корзине:', error);
+        cartItems.innerHTML = '<div class="warehouse-empty">Ошибка отображения товаров</div>';
+    }
     
     // Подсчитать общую прибыль
     const totalProfit = saleCart.reduce((sum, item) => {
@@ -730,14 +755,14 @@ async function handleSale(barcode) {
             prompt.classList.remove('hidden');
             
             // Скрыть подсказку через 5 секунд или при следующем сканировании
-            setTimeout(() => {
+        setTimeout(() => {
                 prompt.classList.add('hidden');
             }, 5000);
         }
         
         return;
     }
-    
+
     // Скрыть подсказку если товар найден
     const prompt = document.getElementById('sale-add-product-prompt');
     if (prompt) {
@@ -920,7 +945,7 @@ function openReceiveModal(product = null) {
     if (product) {
         // Если товар передан, заполнить форму
         document.getElementById('receive-product-id').value = product.id;
-        document.getElementById('receive-product-name').textContent = product.name;
+    document.getElementById('receive-product-name').textContent = product.name;
         document.getElementById('receive-product-barcode').textContent = product.barcode;
         document.getElementById('receive-product-stock').textContent = product.quantity;
         scannerContainer.classList.add('hidden');
@@ -982,10 +1007,10 @@ async function confirmReceive() {
         const updatedProduct = await receiveProduct(currentProduct.id, quantity);
         showNotification(`Принято: ${updatedProduct.name}. Остаток: ${updatedProduct.quantity}`, 'success');
 
-        // Сброс
-        document.getElementById('receive-form').classList.add('hidden');
-        currentProduct = null;
-        currentBarcode = null;
+    // Сброс
+    document.getElementById('receive-form').classList.add('hidden');
+    currentProduct = null;
+    currentBarcode = null;
         
         // Обновить склад если открыт
         const activeView = document.querySelector('.view.active');
@@ -1017,11 +1042,11 @@ async function renderWarehouse(filteredProducts = null) {
             list.innerHTML = '<div class="warehouse-empty">Ошибка: неверный формат данных</div>';
             return;
         }
-        
-        if (products.length === 0) {
-            list.innerHTML = '<div class="warehouse-empty">Склад пуст. Добавьте товары.</div>';
-            return;
-        }
+    
+    if (products.length === 0) {
+        list.innerHTML = '<div class="warehouse-empty">Склад пуст. Добавьте товары.</div>';
+        return;
+    }
 
         list.innerHTML = products.map(product => {
             // Безопасная обработка цен (может быть null, undefined, или строка)
@@ -1031,20 +1056,20 @@ async function renderWarehouse(filteredProducts = null) {
             
             return `
             <div class="warehouse-item" data-product-id="${product.id}">
-                <div class="warehouse-item-header">
+            <div class="warehouse-item-header">
                     <div class="warehouse-item-info">
                         <div class="warehouse-item-name">${escapeHtml(product.name || 'Без названия')}</div>
                         <div class="warehouse-item-barcode">Штрих-код: ${escapeHtml(product.barcode || 'Не указан')}</div>
                         ${price > 0 ? `<div class="warehouse-item-price">Продажа: ${price.toFixed(2)} ₽</div>` : ''}
                         ${purchasePrice > 0 ? `<div class="warehouse-item-purchase-price">Закупка: ${purchasePrice.toFixed(2)} ₽</div>` : ''}
                         ${profit > 0 ? `<div class="warehouse-item-profit">Прибыль: ${profit.toFixed(2)} ₽</div>` : ''}
-                    </div>
-                    <div class="warehouse-item-stock">${product.quantity || 0}</div>
                 </div>
+                    <div class="warehouse-item-stock">${product.quantity || 0}</div>
+            </div>
                 <div class="warehouse-item-actions">
                     <button class="btn-edit" data-product-id="${product.id}" data-action="edit" title="Редактировать">✏️</button>
                     <button class="btn-delete" data-product-id="${product.id}" data-action="delete" title="Удалить">🗑️</button>
-                </div>
+        </div>
             </div>
             `;
         }).join('');
