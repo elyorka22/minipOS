@@ -104,10 +104,19 @@ async function apiRequest(endpoint, options = {}) {
 // Загрузка всех товаров
 async function loadProducts() {
     try {
-        return await apiRequest('/products');
+        const products = await apiRequest('/products');
+        console.log('Загружено товаров:', products?.length || 0);
+        if (products && products.length > 0) {
+            console.log('Пример товара:', products[0]);
+        }
+        return products || [];
     } catch (error) {
         console.error('Ошибка загрузки товаров:', error);
-        showNotification('Ошибка загрузки товаров', 'error');
+        console.error('Детали ошибки:', {
+            message: error.message,
+            stack: error.stack
+        });
+        showNotification('Ошибка загрузки товаров: ' + (error.message || 'Неизвестная ошибка'), 'error');
         return [];
     }
 }
@@ -994,35 +1003,59 @@ let allProducts = []; // Храним все товары для поиска
 async function renderWarehouse(filteredProducts = null) {
     const list = document.getElementById('warehouse-list');
     
+    if (!list) {
+        console.error('Элемент warehouse-list не найден в DOM');
+        return;
+    }
+    
     try {
         const products = filteredProducts || await loadProducts();
         allProducts = products; // Сохраняем для поиска
+        
+        if (!Array.isArray(products)) {
+            console.error('loadProducts вернул не массив:', products);
+            list.innerHTML = '<div class="warehouse-empty">Ошибка: неверный формат данных</div>';
+            return;
+        }
         
         if (products.length === 0) {
             list.innerHTML = '<div class="warehouse-empty">Склад пуст. Добавьте товары.</div>';
             return;
         }
 
-        list.innerHTML = products.map(product => `
+        list.innerHTML = products.map(product => {
+            // Безопасная обработка цен (может быть null, undefined, или строка)
+            const price = parseFloat(product.price) || 0;
+            const purchasePrice = parseFloat(product.purchase_price) || 0;
+            const profit = price > 0 && purchasePrice > 0 ? price - purchasePrice : 0;
+            
+            return `
             <div class="warehouse-item" data-product-id="${product.id}">
                 <div class="warehouse-item-header">
                     <div class="warehouse-item-info">
-                        <div class="warehouse-item-name">${escapeHtml(product.name)}</div>
-                        <div class="warehouse-item-barcode">Штрих-код: ${escapeHtml(product.barcode)}</div>
-                        ${product.price > 0 ? `<div class="warehouse-item-price">Продажа: ${product.price.toFixed(2)} ₽</div>` : ''}
-                        ${product.purchase_price > 0 ? `<div class="warehouse-item-purchase-price">Закупка: ${product.purchase_price.toFixed(2)} ₽</div>` : ''}
-                        ${product.price > 0 && product.purchase_price > 0 ? `<div class="warehouse-item-profit">Прибыль: ${(product.price - product.purchase_price).toFixed(2)} ₽</div>` : ''}
+                        <div class="warehouse-item-name">${escapeHtml(product.name || 'Без названия')}</div>
+                        <div class="warehouse-item-barcode">Штрих-код: ${escapeHtml(product.barcode || 'Не указан')}</div>
+                        ${price > 0 ? `<div class="warehouse-item-price">Продажа: ${price.toFixed(2)} ₽</div>` : ''}
+                        ${purchasePrice > 0 ? `<div class="warehouse-item-purchase-price">Закупка: ${purchasePrice.toFixed(2)} ₽</div>` : ''}
+                        ${profit > 0 ? `<div class="warehouse-item-profit">Прибыль: ${profit.toFixed(2)} ₽</div>` : ''}
                     </div>
-                    <div class="warehouse-item-stock">${product.quantity}</div>
+                    <div class="warehouse-item-stock">${product.quantity || 0}</div>
                 </div>
                 <div class="warehouse-item-actions">
                     <button class="btn-edit" data-product-id="${product.id}" data-action="edit" title="Редактировать">✏️</button>
                     <button class="btn-delete" data-product-id="${product.id}" data-action="delete" title="Удалить">🗑️</button>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
-        list.innerHTML = '<div class="warehouse-empty">Ошибка загрузки склада</div>';
+        console.error('Ошибка при отображении склада:', error);
+        console.error('Детали ошибки:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+        list.innerHTML = `<div class="warehouse-empty">Ошибка загрузки склада: ${error.message || 'Неизвестная ошибка'}</div>`;
     }
 }
 
