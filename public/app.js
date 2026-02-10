@@ -1007,6 +1007,11 @@ async function handleProductInfo(barcode) {
         // Звук и вибрация
         playSuccessSound();
         vibrate([50]);
+    } catch (error) {
+        console.error('Ошибка при поиске товара:', error);
+        showNotification('Ошибка при поиске товара: ' + (error.message || 'Неизвестная ошибка'), 'error');
+        document.getElementById('product-info-panel').classList.add('hidden');
+    }
 }
 
 // Открыть модальное окно приема товара
