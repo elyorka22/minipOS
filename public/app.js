@@ -1383,15 +1383,27 @@ function showSessionsSelector() {
 
 function showSaleInterface() {
     document.getElementById('sessions-selector').classList.add('hidden');
-    document.getElementById('sale-scanner-section').classList.remove('hidden');
+    const scannerSection = document.getElementById('sale-scanner-section');
+    if (scannerSection) {
+        scannerSection.classList.remove('hidden');
+    }
     document.getElementById('sale-cart').classList.remove('hidden');
     document.getElementById('btn-back-to-sessions').style.display = 'block';
     document.getElementById('btn-clear-cart').style.display = saleCart.length > 0 ? 'block' : 'none';
     
-    // Запустить сканер
+    // Запустить сканер после небольшой задержки, чтобы DOM обновился
     setTimeout(() => {
-        startScanner('reader-sale', handleSale);
-    }, 300);
+        const readerElement = document.getElementById('reader-sale');
+        if (readerElement) {
+            startScanner('reader-sale', handleSale).catch(error => {
+                console.error('Ошибка запуска сканера:', error);
+                showNotification('Не удалось запустить камеру. Проверьте разрешения.', 'error');
+            });
+        } else {
+            console.error('Элемент reader-sale не найден в DOM');
+            showNotification('Ошибка: элемент сканера не найден', 'error');
+        }
+    }, 500);
 }
 
 async function closeSessionAndReturn() {
