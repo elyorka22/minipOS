@@ -550,6 +550,112 @@ async function getStats(period = 'day') {
     }
 }
 
+// Создать новую сессию
+async function createSession() {
+    try {
+        // Получить следующий номер сессии
+        const maxSession = await pool.query(`
+            SELECT MAX(session_number) as max_num FROM sessions
+        `);
+        const nextSessionNumber = (maxSession.rows[0]?.max_num || 0) + 1;
+        
+        const result = await pool.query(`
+            INSERT INTO sessions (session_number, status) 
+            VALUES ($1, 'open') 
+            RETURNING *
+        `, [nextSessionNumber]);
+        
+        return result.rows[0];
+    } catch (error) {
+        console.error('Ошибка создания сессии:', error);
+        throw error;
+    }
+}
+
+// Получить все открытые сессии
+async function getOpenSessions() {
+    try {
+        const result = await pool.query(`
+            SELECT * FROM sessions 
+            WHERE status = 'open' 
+            ORDER BY session_number DESC
+        `);
+        return result.rows;
+    } catch (error) {
+        console.error('Ошибка получения открытых сессий:', error);
+        throw error;
+    }
+}
+
+// Получить сессию по ID
+async function getSessionById(id) {
+    try {
+        const result = await pool.query('SELECT * FROM sessions WHERE id = $1', [id]);
+        return result.rows[0] || null;
+    } catch (error) {
+        console.error('Ошибка получения сессии:', error);
+        throw error;
+    }
+}
+
+// Закрыть сессию
+async function closeSession(id) {
+    try {
+        // Подсчитать итоги сессии
+        const stats = await pool.query(`
+            SELECT 
+                COUNT(*) as sales_count,
+                COALESCE(SUM(total_amount), 0) as total_sales,
+                COALESCE(SUM(profit), 0) as total_profit
+            FROM history
+            WHERE session_id = $1 AND operation_type = 'sale'
+        `, [id]);
+        
+        const salesCount = parseInt(stats.rows[0]?.sales_count || 0);
+        const totalSales = parseFloat(stats.rows[0]?.total_sales || 0);
+        const totalProfit = parseFloat(stats.rows[0]?.total_profit || 0);
+        
+        // Обновить сессию
+        const result = await pool.query(`
+            UPDATE sessions 
+            SET status = 'closed', 
+                closed_at = CURRENT_TIMESTAMP,
+                sales_count = $1,
+                total_sales = $2,
+                total_profit = $3
+            WHERE id = $4 
+            RETURNING *
+        `, [salesCount, totalSales, totalProfit, id]);
+        
+        return result.rows[0] || null;
+    } catch (error) {
+        console.error('Ошибка закрытия сессии:', error);
+        throw error;
+    }
+}
+
+// Сохранить операцию в историю (с поддержкой session_id)
+async function saveHistory(product, operationType, quantity, quantityBefore, quantityAfter, price = null, totalAmount = null, purchasePrice = null, sessionId = null) {
+    try {
+        // Если цена не передана, берем из товара
+        const productPrice = price !== null ? price : (product.price || 0);
+        const productPurchasePrice = purchasePrice !== null ? purchasePrice : (product.purchase_price || 0);
+        // Если общая сумма не передана, вычисляем
+        const amount = totalAmount !== null ? totalAmount : (productPrice * quantity);
+        // Рассчитываем прибыль только для продаж
+        const profit = operationType === 'sale' ? (productPrice - productPurchasePrice) * quantity : 0;
+        
+        await pool.query(
+            `INSERT INTO history (session_id, product_id, product_name, product_barcode, operation_type, quantity, quantity_before, quantity_after, price, purchase_price, total_amount, profit)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            [sessionId, product.id, product.name, product.barcode, operationType, quantity, quantityBefore, quantityAfter, productPrice, productPurchasePrice, amount, profit]
+        );
+    } catch (error) {
+        console.error('Ошибка сохранения истории:', error);
+        // Не прерываем выполнение, если не удалось сохранить историю
+    }
+}
+
 module.exports = {
     pool,
     initDatabase,
@@ -564,6 +670,11 @@ module.exports = {
     getHistory,
     getSalesStats,
     getStats,
+    createSession,
+    getOpenSessions,
+    getSessionById,
+    closeSession,
+    saveHistory,
     testConnection
 };
 
