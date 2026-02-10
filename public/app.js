@@ -1018,8 +1018,8 @@ async function renderWarehouse(filteredProducts = null) {
                     <div class="warehouse-item-stock">${product.quantity}</div>
                 </div>
                 <div class="warehouse-item-actions">
-                    <button class="btn-edit" data-product-id="${escapeHtml(product.id)}" data-action="edit" title="Редактировать">✏️</button>
-                    <button class="btn-delete" data-product-id="${escapeHtml(product.id)}" data-action="delete" title="Удалить">🗑️</button>
+                    <button class="btn-edit" data-product-id="${product.id}" data-action="edit" title="Редактировать">✏️</button>
+                    <button class="btn-delete" data-product-id="${product.id}" data-action="delete" title="Удалить">🗑️</button>
                 </div>
             </div>
         `).join('');
