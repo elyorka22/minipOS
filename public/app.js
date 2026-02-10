@@ -423,34 +423,26 @@ async function startScanner(readerId, onSuccess) {
             facingMode: "environment"
         };
         
-        // Защита от множественных срабатываний в обработчике сканера
-        let isProcessing = false;
-        let lastProcessedBarcode = null;
-        let lastProcessedTime = 0;
-        
         // Обработчик успешного распознавания
         const onScanSuccess = (decodedText, decodedResult) => {
-            // Защита от множественных срабатываний
+            // Защита от повторных срабатываний того же кода
             const now = Date.now();
             const normalizedBarcode = String(decodedText).trim();
             
-            // Если обрабатываем тот же код и прошло меньше 2 секунд - игнорируем
-            if (isProcessing || 
-                (lastProcessedBarcode === normalizedBarcode && (now - lastProcessedTime) < 2000)) {
+            // Проверка debounce на уровне обработчика
+            if (lastScannedBarcode === normalizedBarcode && (now - lastScanTime) < SCAN_DEBOUNCE_TIME) {
                 console.log('Пропущено повторное распознавание (debounce):', normalizedBarcode);
                 return;
             }
             
-            // Помечаем, что обрабатываем
-            isProcessing = true;
-            lastProcessedBarcode = normalizedBarcode;
-            lastProcessedTime = now;
+            // Обновляем время последнего сканирования
+            lastScannedBarcode = normalizedBarcode;
+            lastScanTime = now;
             
             console.log('=== Штрих-код распознан ===');
             console.log('Текст:', decodedText);
             console.log('Тип:', decodedResult?.result?.format);
             console.log('Длина:', decodedText?.length);
-            
             console.log('Нормализованный:', normalizedBarcode);
             
             // Валидация штрих-кода перед обработкой
@@ -462,7 +454,6 @@ async function startScanner(readerId, onSuccess) {
                 // Показываем предупреждение, но не блокируем обработку для коротких кодов
                 if (normalizedBarcode.length < 4) {
                     showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
-                    isProcessing = false;
                     return;
                 }
                 // Для остальных случаев - предупреждение, но продолжаем
@@ -475,31 +466,12 @@ async function startScanner(readerId, onSuccess) {
             
             console.log('Вызываем onSuccess с кодом:', normalizedBarcode);
             
-            // Временно останавливаем сканер, чтобы избежать повторных срабатываний
-            currentScanner.pause().then(() => {
-                console.log('Сканер приостановлен для обработки');
-            }).catch(err => {
-                console.warn('Не удалось приостановить сканер:', err);
-            });
-            
             // Вызываем обработчик
             try {
                 onSuccess(normalizedBarcode);
                 console.log('✓ onSuccess вызван успешно');
             } catch (error) {
                 console.error('Ошибка в onSuccess:', error);
-            } finally {
-                // Возобновляем сканер через 1 секунду
-                setTimeout(() => {
-                    isProcessing = false;
-                    if (currentScanner) {
-                        currentScanner.resume().then(() => {
-                            console.log('Сканер возобновлен');
-                        }).catch(err => {
-                            console.warn('Не удалось возобновить сканер:', err);
-                        });
-                    }
-                }, 1000);
             }
         };
         
