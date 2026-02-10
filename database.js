@@ -675,6 +675,123 @@ async function getSessionSales(sessionId) {
     }
 }
 
+// Сохранить товар в корзину сессии
+async function saveSessionItem(sessionId, product, quantity) {
+    try {
+        const result = await pool.query(`
+            INSERT INTO session_items (session_id, product_id, product_name, product_barcode, quantity, price, purchase_price)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (session_id, product_id) 
+            DO UPDATE SET 
+                quantity = session_items.quantity + $5,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING *
+        `, [
+            sessionId,
+            product.id,
+            product.name,
+            product.barcode,
+            quantity,
+            product.price || 0,
+            product.purchase_price || 0
+        ]);
+        return result.rows[0];
+    } catch (error) {
+        console.error('Ошибка сохранения товара в сессию:', error);
+        throw error;
+    }
+}
+
+// Обновить количество товара в корзине сессии
+async function updateSessionItemQuantity(sessionId, productId, quantity) {
+    try {
+        if (quantity <= 0) {
+            // Удалить товар если количество 0 или меньше
+            await pool.query(`
+                DELETE FROM session_items 
+                WHERE session_id = $1 AND product_id = $2
+            `, [sessionId, productId]);
+            return null;
+        }
+        
+        const result = await pool.query(`
+            UPDATE session_items 
+            SET quantity = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE session_id = $2 AND product_id = $3
+            RETURNING *
+        `, [quantity, sessionId, productId]);
+        return result.rows[0] || null;
+    } catch (error) {
+        console.error('Ошибка обновления товара в сессии:', error);
+        throw error;
+    }
+}
+
+// Удалить товар из корзины сессии
+async function removeSessionItem(sessionId, productId) {
+    try {
+        await pool.query(`
+            DELETE FROM session_items 
+            WHERE session_id = $1 AND product_id = $2
+        `, [sessionId, productId]);
+    } catch (error) {
+        console.error('Ошибка удаления товара из сессии:', error);
+        throw error;
+    }
+}
+
+// Получить все товары из корзины сессии
+async function getSessionItems(sessionId) {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                si.*,
+                p.name as current_name,
+                p.barcode as current_barcode,
+                p.price as current_price,
+                p.purchase_price as current_purchase_price,
+                p.quantity as stock_quantity
+            FROM session_items si
+            LEFT JOIN products p ON si.product_id = p.id
+            WHERE si.session_id = $1
+            ORDER BY si.created_at ASC
+        `, [sessionId]);
+        return result.rows;
+    } catch (error) {
+        console.error('Ошибка получения товаров сессии:', error);
+        throw error;
+    }
+}
+
+// Очистить корзину сессии
+async function clearSessionItems(sessionId) {
+    try {
+        await pool.query(`
+            DELETE FROM session_items 
+            WHERE session_id = $1
+        `, [sessionId]);
+    } catch (error) {
+        console.error('Ошибка очистки корзины сессии:', error);
+        throw error;
+    }
+}
+
+// Удалить сессию
+async function deleteSession(id) {
+    try {
+        // Удаление сессии автоматически удалит все связанные записи благодаря CASCADE
+        const result = await pool.query(`
+            DELETE FROM sessions 
+            WHERE id = $1 
+            RETURNING *
+        `, [id]);
+        return result.rows[0] || null;
+    } catch (error) {
+        console.error('Ошибка удаления сессии:', error);
+        throw error;
+    }
+}
+
 // Закрыть сессию
 async function closeSession(id) {
     try {
