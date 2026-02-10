@@ -165,7 +165,7 @@ async function findProductByBarcode(barcode, retries = 2) {
 }
 
 // Добавление товара
-async function addProduct(name, barcode, quantity, price) {
+async function addProduct(name, barcode, quantity, price, purchase_price) {
     try {
         return await apiRequest('/products', {
             method: 'POST',
@@ -173,7 +173,8 @@ async function addProduct(name, barcode, quantity, price) {
                 name: name.trim(),
                 barcode: barcode.trim(),
                 quantity: parseInt(quantity) || 0,
-                price: parseFloat(price) || 0
+                price: parseFloat(price) || 0,
+                purchase_price: parseFloat(purchase_price) || 0
             })
         });
     } catch (error) {
@@ -995,11 +996,11 @@ async function renderWarehouse(filteredProducts = null) {
 }
 
 // Обновление товара
-async function updateProduct(id, name, barcode, quantity, price) {
+async function updateProduct(id, name, barcode, quantity, price, purchase_price) {
     try {
         return await apiRequest(`/products/${id}`, {
             method: 'PUT',
-            body: JSON.stringify({ name, barcode, quantity, price })
+            body: JSON.stringify({ name, barcode, quantity, price, purchase_price })
         });
     } catch (error) {
         if (error.message.includes('уже существует')) {

@@ -30,6 +30,7 @@ async function initDatabase() {
                 barcode VARCHAR(255) UNIQUE NOT NULL,
                 quantity INTEGER NOT NULL DEFAULT 0,
                 price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+                purchase_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -47,6 +48,20 @@ async function initDatabase() {
             // Игнорируем ошибку если колонка уже существует
             if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
                 console.warn('Предупреждение при добавлении поля price:', error.message);
+            }
+        }
+
+        // Добавить поле purchase_price если его нет (для существующих БД)
+        try {
+            await pool.query(`
+                ALTER TABLE products 
+                ADD COLUMN IF NOT EXISTS purchase_price DECIMAL(10, 2) NOT NULL DEFAULT 0
+            `);
+            console.log('Поле purchase_price добавлено/проверено');
+        } catch (error) {
+            // Игнорируем ошибку если колонка уже существует
+            if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
+                console.warn('Предупреждение при добавлении поля purchase_price:', error.message);
             }
         }
 
@@ -165,10 +180,10 @@ async function getProductByBarcode(barcode) {
 // Создать товар
 async function createProduct(product) {
     try {
-        const { id, name, barcode, quantity, price = 0 } = product;
+        const { id, name, barcode, quantity, price = 0, purchase_price = 0 } = product;
         const result = await pool.query(
-            'INSERT INTO products (id, name, barcode, quantity, price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [id, name, barcode, quantity || 0, price || 0]
+            'INSERT INTO products (id, name, barcode, quantity, price, purchase_price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [id, name, barcode, quantity || 0, price || 0, purchase_price || 0]
         );
         return result.rows[0];
     } catch (error) {
@@ -281,7 +296,7 @@ async function increaseQuantity(id, amount) {
 }
 
 // Уменьшить количество товара
-async function decreaseQuantity(id, amount = 1, price = null) {
+async function decreaseQuantity(id, amount = 1, price = null, purchasePrice = null) {
     try {
         // Получить текущее состояние товара
         const productBefore = await getProductById(id);
@@ -292,6 +307,7 @@ async function decreaseQuantity(id, amount = 1, price = null) {
         const quantityBefore = productBefore.quantity;
         // Используем переданную цену или цену из товара
         const productPrice = price !== null ? price : (productBefore.price || 0);
+        const productPurchasePrice = purchasePrice !== null ? purchasePrice : (productBefore.purchase_price || 0);
         const totalAmount = productPrice * amount;
         
         const result = await pool.query(
@@ -301,8 +317,8 @@ async function decreaseQuantity(id, amount = 1, price = null) {
         
         const productAfter = result.rows[0];
         if (productAfter) {
-            // Сохранить в историю с ценой
-            await saveHistory(productAfter, 'sale', amount, quantityBefore, productAfter.quantity, productPrice, totalAmount);
+            // Сохранить в историю с ценами
+            await saveHistory(productAfter, 'sale', amount, quantityBefore, productAfter.quantity, productPrice, totalAmount, productPurchasePrice);
         }
         
         return productAfter || null;

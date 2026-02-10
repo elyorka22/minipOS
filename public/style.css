@@ -756,10 +756,30 @@ body {
     margin-top: 0.25rem;
 }
 
+.warehouse-item-purchase-price {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 0.15rem;
+}
+
+.warehouse-item-profit {
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 0.15rem;
+}
+
 .cart-item-price {
     color: var(--success);
     font-weight: 600;
     font-size: 0.9rem;
+    margin-left: 0.5rem;
+}
+
+.cart-item-profit {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.85rem;
     margin-left: 0.5rem;
 }
 
