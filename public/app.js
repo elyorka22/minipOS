@@ -660,21 +660,28 @@ function highlightLastCartItem() {
 
 // Продажа товара (обработка сканирования)
 async function handleSale(barcode) {
+    console.log('=== handleSale вызван ===');
+    console.log('Штрих-код:', barcode);
+    
     // Защита от повторных сканирований одного кода
     const now = Date.now();
     if (lastScannedBarcode === barcode && (now - lastScanTime) < SCAN_DEBOUNCE_TIME) {
-        console.log('Пропущено повторное сканирование того же кода');
+        console.log('Пропущено повторное сканирование того же кода (debounce)');
         return;
     }
     
     lastScannedBarcode = barcode;
     lastScanTime = now;
     
+    console.log('Начинаем обработку штрих-кода:', barcode);
+    
     // Показать индикатор загрузки
     showNotification('Поиск товара...', 'success');
     
     // Поиск товара с повторными попытками
+    console.log('Ищем товар в базе...');
     const product = await findProductByBarcode(barcode, 2);
+    console.log('Результат поиска:', product ? `найден: ${product.name}` : 'не найден');
     
     if (!product) {
         // Показать уведомление
