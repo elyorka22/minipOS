@@ -96,12 +96,23 @@ app.get('/api/products/barcode/:barcode', async (req, res) => {
             return res.status(503).json({ error: 'База данных не инициализирована' });
         }
 
-        const product = await db.getProductByBarcode(req.params.barcode);
+        // Декодировать штрих-код из URL и нормализовать
+        const barcode = decodeURIComponent(req.params.barcode).trim();
+        
+        console.log('Поиск товара по штрих-коду:', {
+            raw: req.params.barcode,
+            decoded: barcode,
+            length: barcode.length
+        });
+        
+        const product = await db.getProductByBarcode(barcode);
         
         if (!product) {
+            console.log('Товар не найден в базе данных для штрих-кода:', barcode);
             return res.status(404).json({ error: 'Товар не найден' });
         }
         
+        console.log('Товар найден:', product.id, product.name);
         res.json(product);
     } catch (error) {
         console.error('Ошибка поиска товара:', error);
