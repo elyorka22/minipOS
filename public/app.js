@@ -1355,9 +1355,12 @@ function renderSessionsList(sessions) {
     }
     
     listEl.innerHTML = sessions.map(session => `
-        <button class="btn-session" data-session-id="${session.id}" data-session-number="${session.session_number}">
-            Сессия ${session.session_number}
-        </button>
+        <div class="session-item">
+            <button class="btn-session" data-session-id="${session.id}" data-session-number="${session.session_number}">
+                Сессия ${session.session_number}
+            </button>
+            <button class="btn-delete-session" data-session-id="${session.id}" data-session-number="${session.session_number}" title="Удалить сессию">🗑️</button>
+        </div>
     `).join('');
 }
 
@@ -1378,34 +1381,36 @@ async function selectSession(sessionId) {
     }
 }
 
-// Загрузить корзину из продаж сессии
+// Загрузить корзину из товаров сессии
 async function loadSessionCart(sessionId) {
     try {
-        const sales = await apiRequest(`/sessions/${sessionId}/sales`);
+        const items = await apiRequest(`/sessions/${sessionId}/items`);
         
-        // Группируем продажи по товарам и суммируем количество
-        const cartMap = new Map();
+        // Преобразуем товары из БД в формат корзины
+        saleCart = [];
         
-        for (const sale of sales) {
-            const productId = sale.product_id;
-            
-            if (cartMap.has(productId)) {
-                const item = cartMap.get(productId);
-                item.quantityInCart += sale.quantity;
+        for (const item of items) {
+            // Используем актуальную информацию о товаре из БД или из сессии
+            const product = await findProductByBarcode(item.product_barcode);
+            if (product) {
+                saleCart.push({
+                    ...product,
+                    quantityInCart: item.quantity || 1
+                });
             } else {
-                // Получаем актуальную информацию о товаре
-                const product = await findProductByBarcode(sale.product_barcode);
-                if (product) {
-                    cartMap.set(productId, {
-                        ...product,
-                        quantityInCart: sale.quantity
-                    });
-                }
+                // Если товар не найден, используем данные из сессии
+                saleCart.push({
+                    id: item.product_id,
+                    name: item.current_name || item.product_name,
+                    barcode: item.current_barcode || item.product_barcode,
+                    quantity: item.stock_quantity || 0,
+                    price: item.current_price || item.price || 0,
+                    purchase_price: item.current_purchase_price || item.purchase_price || 0,
+                    quantityInCart: item.quantity || 1
+                });
             }
         }
         
-        // Преобразуем Map в массив
-        saleCart = Array.from(cartMap.values());
         renderSaleCart();
         
         console.log(`Загружено ${saleCart.length} товаров из сессии ${currentSessionNumber}`);
