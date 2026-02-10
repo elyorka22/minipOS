@@ -901,8 +901,8 @@ async function deleteProduct(id) {
     }
 }
 
-// Редактирование товара
-async function editProduct(id) {
+// Редактирование товара (глобальная функция для onclick)
+window.editProduct = async function(id) {
     const product = allProducts.find(p => p.id === id);
     if (!product) {
         showNotification('Товар не найден', 'error');
@@ -919,8 +919,8 @@ async function editProduct(id) {
     document.getElementById('modal-edit-product').classList.remove('hidden');
 }
 
-// Подтверждение удаления товара
-async function deleteProductConfirm(id) {
+// Подтверждение удаления товара (глобальная функция для onclick)
+window.deleteProductConfirm = async function(id) {
     const product = allProducts.find(p => p.id === id);
     if (!product) {
         showNotification('Товар не найден', 'error');
