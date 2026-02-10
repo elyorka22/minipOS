@@ -324,8 +324,9 @@ app.get('*', (req, res) => {
 async function startServer() {
     await initializeApp();
     
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`Сервер запущен на порту ${PORT}`);
+        console.log(`Доступен по адресу: http://0.0.0.0:${PORT}`);
         if (dbInitialized) {
             console.log('База данных: PostgreSQL');
         } else {
