@@ -1398,6 +1398,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         searchProducts(e.target.value);
     });
 
+    // Делегирование событий для кнопок редактирования и удаления на складе
+    document.getElementById('warehouse-list').addEventListener('click', async (e) => {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
+        
+        const productId = button.dataset.productId;
+        if (!productId) return;
+        
+        const action = button.dataset.action;
+        
+        if (action === 'edit') {
+            await editProduct(productId);
+        } else if (action === 'delete') {
+            await deleteProductConfirm(productId);
+        }
+    });
+
     // Поиск в истории
     const historySearchInput = document.getElementById('history-search');
     if (historySearchInput) {
