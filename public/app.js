@@ -1402,17 +1402,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     const warehouseList = document.getElementById('warehouse-list');
     if (warehouseList) {
         warehouseList.addEventListener('click', async (e) => {
-            // Проверяем клик на кнопке или внутри кнопки (иконка)
-            const button = e.target.closest('[data-action]') || e.target.closest('.btn-edit') || e.target.closest('.btn-delete');
-            if (!button) return;
+            console.log('Клик в warehouse-list:', e.target);
             
-            // Получаем product-id из data-атрибута или из родительского элемента
-            let productId = button.dataset.productId;
+            // Проверяем клик на кнопке или внутри кнопки (иконка)
+            let button = e.target;
+            
+            // Если клик не на кнопке, ищем ближайшую кнопку
+            if (!button.classList.contains('btn-edit') && !button.classList.contains('btn-delete')) {
+                button = button.closest('.btn-edit') || button.closest('.btn-delete');
+            }
+            
+            if (!button) {
+                console.log('Клик не на кнопке редактирования/удаления');
+                return;
+            }
+            
+            console.log('Найдена кнопка:', button);
+            
+            // Получаем product-id из data-атрибута
+            let productId = button.getAttribute('data-product-id');
+            
+            // Если не нашли, ищем в родительском элементе warehouse-item
             if (!productId) {
-                // Если не нашли в кнопке, ищем в родительском элементе warehouse-item
                 const warehouseItem = button.closest('.warehouse-item');
                 if (warehouseItem) {
-                    productId = warehouseItem.dataset.productId;
+                    productId = warehouseItem.getAttribute('data-product-id');
                 }
             }
             
@@ -1421,27 +1435,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             
-            // Определяем действие
-            let action = button.dataset.action;
-            if (!action) {
-                // Если action не в data-атрибуте, определяем по классу
-                if (button.classList.contains('btn-edit')) {
-                    action = 'edit';
-                } else if (button.classList.contains('btn-delete')) {
-                    action = 'delete';
-                }
+            console.log('Product ID:', productId);
+            
+            // Определяем действие по классу
+            let action = null;
+            if (button.classList.contains('btn-edit')) {
+                action = 'edit';
+            } else if (button.classList.contains('btn-delete')) {
+                action = 'delete';
             }
             
-            console.log('Клик на кнопке:', action, 'productId:', productId);
+            if (!action) {
+                console.error('Не определено действие для кнопки:', button);
+                return;
+            }
             
-            if (action === 'edit') {
-                e.preventDefault();
-                e.stopPropagation();
-                await editProduct(productId);
-            } else if (action === 'delete') {
-                e.preventDefault();
-                e.stopPropagation();
-                await deleteProductConfirm(productId);
+            console.log('Действие:', action);
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            try {
+                if (action === 'edit') {
+                    await editProduct(productId);
+                } else if (action === 'delete') {
+                    await deleteProductConfirm(productId);
+                }
+            } catch (error) {
+                console.error('Ошибка при выполнении действия:', error);
+                showNotification('Ошибка: ' + error.message, 'error');
             }
         });
     }
