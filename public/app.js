@@ -1399,21 +1399,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Делегирование событий для кнопок редактирования и удаления на складе
-    document.getElementById('warehouse-list').addEventListener('click', async (e) => {
-        const button = e.target.closest('[data-action]');
-        if (!button) return;
-        
-        const productId = button.dataset.productId;
-        if (!productId) return;
-        
-        const action = button.dataset.action;
-        
-        if (action === 'edit') {
-            await editProduct(productId);
-        } else if (action === 'delete') {
-            await deleteProductConfirm(productId);
-        }
-    });
+    const warehouseList = document.getElementById('warehouse-list');
+    if (warehouseList) {
+        warehouseList.addEventListener('click', async (e) => {
+            // Проверяем клик на кнопке или внутри кнопки (иконка)
+            const button = e.target.closest('[data-action]') || e.target.closest('.btn-edit') || e.target.closest('.btn-delete');
+            if (!button) return;
+            
+            // Получаем product-id из data-атрибута или из родительского элемента
+            let productId = button.dataset.productId;
+            if (!productId) {
+                // Если не нашли в кнопке, ищем в родительском элементе warehouse-item
+                const warehouseItem = button.closest('.warehouse-item');
+                if (warehouseItem) {
+                    productId = warehouseItem.dataset.productId;
+                }
+            }
+            
+            if (!productId) {
+                console.error('Не найден product-id для кнопки:', button);
+                return;
+            }
+            
+            // Определяем действие
+            let action = button.dataset.action;
+            if (!action) {
+                // Если action не в data-атрибуте, определяем по классу
+                if (button.classList.contains('btn-edit')) {
+                    action = 'edit';
+                } else if (button.classList.contains('btn-delete')) {
+                    action = 'delete';
+                }
+            }
+            
+            console.log('Клик на кнопке:', action, 'productId:', productId);
+            
+            if (action === 'edit') {
+                e.preventDefault();
+                e.stopPropagation();
+                await editProduct(productId);
+            } else if (action === 'delete') {
+                e.preventDefault();
+                e.stopPropagation();
+                await deleteProductConfirm(productId);
+            }
+        });
+    }
 
     // Поиск в истории
     const historySearchInput = document.getElementById('history-search');
