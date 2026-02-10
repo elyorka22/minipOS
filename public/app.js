@@ -838,6 +838,11 @@ async function handleProductInfo(barcode) {
     document.getElementById('product-info-name').textContent = product.name;
     document.getElementById('product-info-barcode').textContent = product.barcode;
     document.getElementById('product-info-quantity').textContent = product.quantity;
+    const price = product.price || 0;
+    const priceEl = document.getElementById('product-info-price');
+    if (priceEl) {
+        priceEl.textContent = price > 0 ? `${price.toFixed(2)} ₽` : 'Не указана';
+    }
     
     // Форматирование дат
     if (product.created_at) {
@@ -974,6 +979,7 @@ async function renderWarehouse(filteredProducts = null) {
                     <div class="warehouse-item-info">
                         <div class="warehouse-item-name">${escapeHtml(product.name)}</div>
                         <div class="warehouse-item-barcode">Штрих-код: ${escapeHtml(product.barcode)}</div>
+                        ${product.price > 0 ? `<div class="warehouse-item-price">${product.price.toFixed(2)} ₽</div>` : ''}
                     </div>
                     <div class="warehouse-item-stock">${product.quantity}</div>
                 </div>
@@ -989,11 +995,11 @@ async function renderWarehouse(filteredProducts = null) {
 }
 
 // Обновление товара
-async function updateProduct(id, name, barcode, quantity) {
+async function updateProduct(id, name, barcode, quantity, price) {
     try {
         return await apiRequest(`/products/${id}`, {
             method: 'PUT',
-            body: JSON.stringify({ name, barcode, quantity })
+            body: JSON.stringify({ name, barcode, quantity, price })
         });
     } catch (error) {
         if (error.message.includes('уже существует')) {

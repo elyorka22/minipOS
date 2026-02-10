@@ -749,6 +749,27 @@ body {
     font-weight: 600;
 }
 
+.warehouse-item-price {
+    color: var(--success);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.cart-item-price {
+    color: var(--success);
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-left: 0.5rem;
+}
+
+.cart-item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
 .warehouse-empty {
     text-align: center;
     padding: 3rem 1rem;
