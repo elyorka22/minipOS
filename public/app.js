@@ -1191,12 +1191,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         openReceiveModal();
     });
 
+    // Кнопка сканирования в модальном окне приема
+    document.getElementById('btn-scan-receive').addEventListener('click', () => {
+        const scannerContainer = document.getElementById('receive-scanner-container');
+        const productInfo = document.getElementById('receive-product-info');
+        scannerContainer.classList.remove('hidden');
+        productInfo.classList.add('hidden');
+        startScanner('reader-receive-modal', handleReceiveModalScan);
+    });
+
+    // Закрыть сканер в модальном окне приема
+    document.getElementById('scanner-receive-close').addEventListener('click', async () => {
+        await stopScanner();
+        document.getElementById('receive-scanner-container').classList.add('hidden');
+        document.getElementById('receive-product-info').classList.remove('hidden');
+    });
+
     // Модальное окно приема товара
-    document.getElementById('modal-receive-close').addEventListener('click', () => {
+    document.getElementById('modal-receive-close').addEventListener('click', async () => {
+        await stopScanner();
         document.getElementById('modal-receive-product').classList.add('hidden');
     });
 
-    document.getElementById('form-receive-cancel').addEventListener('click', () => {
+    document.getElementById('form-receive-cancel').addEventListener('click', async () => {
+        await stopScanner();
         document.getElementById('modal-receive-product').classList.add('hidden');
     });
 
