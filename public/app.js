@@ -129,6 +129,12 @@ async function findProductByBarcode(barcode, retries = 2) {
     // Нормализация штрих-кода (убрать пробелы, привести к строке)
     const normalizedBarcode = String(barcode).trim();
     
+    console.log('Поиск товара по штрих-коду:', {
+        original: barcode,
+        normalized: normalizedBarcode,
+        length: normalizedBarcode.length
+    });
+    
     // Очистка устаревших записей
     cleanCache();
     
@@ -139,20 +145,34 @@ async function findProductByBarcode(barcode, retries = 2) {
         return cached.product;
     }
     
+    const apiEndpoint = `/products/barcode/${encodeURIComponent(normalizedBarcode)}`;
+    console.log('Запрос к API:', apiEndpoint);
+    
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            const product = await apiRequest(`/products/barcode/${encodeURIComponent(normalizedBarcode)}`);
+            const product = await apiRequest(apiEndpoint);
+            console.log('Ответ от API:', product);
+            
             if (product) {
                 // Сохранить в кэш
                 productCache.set(normalizedBarcode, {
                     product: product,
                     timestamp: Date.now()
                 });
+                console.log('Товар найден и сохранен в кэш');
                 return product;
+            } else {
+                console.log('API вернул null или undefined');
             }
         } catch (error) {
-            if (error.message.includes('404')) {
+            console.error(`Ошибка при попытке ${attempt + 1}:`, {
+                message: error.message,
+                endpoint: apiEndpoint
+            });
+            
+            if (error.message.includes('404') || error.message.includes('не найден')) {
                 // Товар не найден - это нормально, не нужно повторять
+                console.log('Товар не найден (404)');
                 // Кэшируем null результат на короткое время (30 секунд)
                 productCache.set(normalizedBarcode, {
                     product: null,
@@ -163,7 +183,7 @@ async function findProductByBarcode(barcode, retries = 2) {
             
             // Ошибка сети или сервера - повторить попытку
             if (attempt < retries) {
-                console.log(`Попытка ${attempt + 1} не удалась, повторяю...`);
+                console.log(`Попытка ${attempt + 1} не удалась, повторяю через 300мс...`);
                 await new Promise(resolve => setTimeout(resolve, 300)); // Задержка 300мс
                 continue;
             }
@@ -173,6 +193,7 @@ async function findProductByBarcode(barcode, retries = 2) {
         }
     }
     
+    console.log('Товар не найден после всех попыток');
     return null;
 }
 
