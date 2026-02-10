@@ -113,6 +113,64 @@ async function receiveProduct(productId, quantity) {
     }
 }
 
+// Воспроизвести звук успеха
+function playBeepSound() {
+    try {
+        // Создаем простой звуковой сигнал через Web Audio API
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800; // Частота звука (Гц) - высокий тон для успеха
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.15);
+    } catch (error) {
+        console.log('Не удалось воспроизвести звук:', error);
+    }
+}
+
+// Воспроизвести звук ошибки
+function playErrorSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 400; // Низкий тон для ошибки
+        oscillator.type = 'sawtooth';
+        
+        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
+    } catch (error) {
+        console.log('Не удалось воспроизвести звук ошибки:', error);
+    }
+}
+
+// Вибрация (для мобильных устройств)
+function vibrate(pattern = [50]) {
+    if ('vibrate' in navigator) {
+        try {
+            navigator.vibrate(pattern);
+        } catch (error) {
+            console.log('Вибрация не поддерживается:', error);
+        }
+    }
+}
+
 // Показать уведомление
 function showNotification(message, type = 'success') {
     const notification = document.getElementById('notification');
@@ -226,6 +284,11 @@ function addToSaleCart(product) {
         existingItem.quantity = product.quantity; // Обновить остаток
         existingItem.name = product.name;
         renderSaleCart();
+        
+        // Звук ошибки (более низкий тон)
+        playErrorSound();
+        vibrate([100, 50, 100]); // Двойная вибрация для ошибки
+        
         showNotification(`Товар "${product.name}" уже есть в корзине. Используйте кнопки +/- для изменения количества.`, 'error');
         return;
     }
@@ -242,7 +305,15 @@ function addToSaleCart(product) {
     });
     
     renderSaleCart();
+    
+    // Звук и вибрация при добавлении товара
+    playBeepSound();
+    vibrate([50]); // Короткая вибрация 50мс
+    
     showNotification(`${product.name} добавлен в корзину`, 'success');
+    
+    // Визуальная подсветка последнего добавленного товара
+    highlightLastCartItem();
 }
 
 // Удалить товар из корзины
@@ -307,8 +378,8 @@ function renderSaleCart() {
     document.getElementById('cart-total-count').textContent = totalCount;
     
     // Отобразить товары
-    cartItems.innerHTML = saleCart.map(item => `
-        <div class="cart-item">
+    cartItems.innerHTML = saleCart.map((item, index) => `
+        <div class="cart-item" data-item-id="${item.id}" data-item-index="${index}">
             <div class="cart-item-info">
                 <div class="cart-item-name">${escapeHtml(item.name)}</div>
                 <div class="cart-item-barcode">${escapeHtml(item.barcode)}</div>
@@ -322,6 +393,26 @@ function renderSaleCart() {
             </div>
         </div>
     `).join('');
+}
+
+// Подсветить последний добавленный товар
+function highlightLastCartItem() {
+    if (saleCart.length === 0) return;
+    
+    // Найти последний товар в DOM (он всегда последний в списке)
+    const cartItems = document.querySelectorAll('.cart-item');
+    if (cartItems.length > 0) {
+        const lastItem = cartItems[cartItems.length - 1];
+        lastItem.classList.add('cart-item-highlight');
+        
+        // Прокрутить к последнему товару
+        lastItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Убрать подсветку через 2 секунды
+        setTimeout(() => {
+            lastItem.classList.remove('cart-item-highlight');
+        }, 2000);
+    }
 }
 
 // Продажа товара (обработка сканирования)
