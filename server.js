@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
+const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,198 +11,308 @@ app.use(express.json());
 // Статические файлы из public/
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Путь к файлу данных
-const DATA_FILE = path.join(__dirname, 'data', 'products.json');
+// Инициализация БД при запуске
+let dbInitialized = false;
 
-// Создать директорию data если её нет
-const dataDir = path.dirname(DATA_FILE);
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-}
-
-// Инициализация файла данных если его нет
-if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
-}
-
-// Чтение данных
-function readProducts() {
-    try {
-        const data = fs.readFileSync(DATA_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Ошибка чтения данных:', error);
-        return [];
+async function initializeApp() {
+    // Проверяем наличие DATABASE_URL или DATABASE_PUBLIC_URL
+    const databaseUrl = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+    
+    // Диагностика: проверим, что видит приложение
+    console.log('=== Диагностика подключения к БД ===');
+    console.log('DATABASE_URL установлен:', !!process.env.DATABASE_URL);
+    console.log('DATABASE_PUBLIC_URL установлен:', !!process.env.DATABASE_PUBLIC_URL);
+    console.log('Используется URL:', databaseUrl ? 'да' : 'нет');
+    if (databaseUrl) {
+        // Показываем только начало URL для безопасности (без пароля)
+        const urlPreview = databaseUrl.substring(0, 20) + '...';
+        console.log('URL (превью):', urlPreview);
     }
-}
-
-// Запись данных
-function writeProducts(products) {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2));
-        return true;
-    } catch (error) {
-        console.error('Ошибка записи данных:', error);
-        return false;
+    
+    if (databaseUrl) {
+        try {
+            const urlType = process.env.DATABASE_URL ? 'DATABASE_URL (внутренний)' : 'DATABASE_PUBLIC_URL (публичный)';
+            console.log(`Используется PostgreSQL через ${urlType}`);
+            await db.initDatabase();
+            dbInitialized = true;
+            console.log('✓ PostgreSQL успешно подключен и инициализирован');
+        } catch (error) {
+            console.error('✗ Ошибка инициализации БД:', error);
+            console.error('Детали ошибки:', {
+                message: error.message,
+                code: error.code,
+                detail: error.detail
+            });
+            console.log('Приложение продолжит работу, но БД недоступна');
+        }
+    } else {
+        console.log('⚠ DATABASE_URL не установлен, используется файловое хранилище');
+        console.log('Для использования PostgreSQL установите переменную DATABASE_URL в Railway');
     }
+    console.log('=====================================');
 }
 
 // API Routes
 
 // Получить все товары
-app.get('/api/products', (req, res) => {
-    const products = readProducts();
-    res.json(products);
+app.get('/api/products', async (req, res) => {
+    try {
+        if (dbInitialized) {
+            const products = await db.getAllProducts();
+            res.json(products);
+        } else {
+            res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+    } catch (error) {
+        console.error('Ошибка получения товаров:', error);
+        res.status(500).json({ error: 'Ошибка получения товаров' });
+    }
 });
 
 // Получить товар по ID
-app.get('/api/products/:id', (req, res) => {
-    const products = readProducts();
-    const product = products.find(p => p.id === req.params.id);
-    
-    if (!product) {
-        return res.status(404).json({ error: 'Товар не найден' });
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const product = await db.getProductById(req.params.id);
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        res.json(product);
+    } catch (error) {
+        console.error('Ошибка получения товара:', error);
+        res.status(500).json({ error: 'Ошибка получения товара' });
     }
-    
-    res.json(product);
 });
 
 // Найти товар по штрих-коду
-app.get('/api/products/barcode/:barcode', (req, res) => {
-    const products = readProducts();
-    const product = products.find(p => p.barcode === req.params.barcode);
-    
-    if (!product) {
-        return res.status(404).json({ error: 'Товар не найден' });
+app.get('/api/products/barcode/:barcode', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const product = await db.getProductByBarcode(req.params.barcode);
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        res.json(product);
+    } catch (error) {
+        console.error('Ошибка поиска товара:', error);
+        res.status(500).json({ error: 'Ошибка поиска товара' });
     }
-    
-    res.json(product);
 });
 
 // Создать товар
-app.post('/api/products', (req, res) => {
-    const { name, barcode, quantity } = req.body;
-    
-    if (!name || !barcode) {
-        return res.status(400).json({ error: 'Название и штрих-код обязательны' });
-    }
-    
-    const products = readProducts();
-    
-    // Проверка на дубликат
-    if (products.find(p => p.barcode === barcode)) {
-        return res.status(400).json({ error: 'Товар с таким штрих-кодом уже существует' });
-    }
-    
-    const newProduct = {
-        id: Date.now().toString(),
-        name: name.trim(),
-        barcode: barcode.trim(),
-        quantity: parseInt(quantity) || 0
-    };
-    
-    products.push(newProduct);
-    
-    if (writeProducts(products)) {
-        res.status(201).json(newProduct);
-    } else {
-        res.status(500).json({ error: 'Ошибка сохранения товара' });
+app.post('/api/products', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const { name, barcode, quantity } = req.body;
+        
+        if (!name || !barcode) {
+            return res.status(400).json({ error: 'Название и штрих-код обязательны' });
+        }
+        
+        const newProduct = {
+            id: Date.now().toString(),
+            name: name.trim(),
+            barcode: barcode.trim(),
+            quantity: parseInt(quantity) || 0
+        };
+        
+        const product = await db.createProduct(newProduct);
+        res.status(201).json(product);
+    } catch (error) {
+        console.error('Ошибка создания товара:', error);
+        if (error.message.includes('уже существует')) {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Ошибка создания товара' });
     }
 });
 
 // Обновить товар
-app.put('/api/products/:id', (req, res) => {
-    const { name, barcode, quantity } = req.body;
-    const products = readProducts();
-    const productIndex = products.findIndex(p => p.id === req.params.id);
-    
-    if (productIndex === -1) {
-        return res.status(404).json({ error: 'Товар не найден' });
-    }
-    
-    // Проверка на дубликат штрих-кода (если изменился)
-    if (barcode && barcode !== products[productIndex].barcode) {
-        if (products.find(p => p.barcode === barcode && p.id !== req.params.id)) {
-            return res.status(400).json({ error: 'Товар с таким штрих-кодом уже существует' });
+app.put('/api/products/:id', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
         }
-    }
-    
-    if (name) products[productIndex].name = name.trim();
-    if (barcode) products[productIndex].barcode = barcode.trim();
-    if (quantity !== undefined) products[productIndex].quantity = parseInt(quantity) || 0;
-    
-    if (writeProducts(products)) {
-        res.json(products[productIndex]);
-    } else {
-        res.status(500).json({ error: 'Ошибка сохранения товара' });
+
+        const { name, barcode, quantity } = req.body;
+        const updates = {};
+        
+        if (name !== undefined) updates.name = name.trim();
+        if (barcode !== undefined) updates.barcode = barcode.trim();
+        if (quantity !== undefined) updates.quantity = parseInt(quantity) || 0;
+        
+        const product = await db.updateProduct(req.params.id, updates);
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        res.json(product);
+    } catch (error) {
+        console.error('Ошибка обновления товара:', error);
+        if (error.message.includes('уже существует')) {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Ошибка обновления товара' });
     }
 });
 
 // Удалить товар
-app.delete('/api/products/:id', (req, res) => {
-    const products = readProducts();
-    const filteredProducts = products.filter(p => p.id !== req.params.id);
-    
-    if (products.length === filteredProducts.length) {
-        return res.status(404).json({ error: 'Товар не найден' });
-    }
-    
-    if (writeProducts(filteredProducts)) {
+app.delete('/api/products/:id', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const product = await db.deleteProduct(req.params.id);
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
         res.json({ message: 'Товар удален' });
-    } else {
+    } catch (error) {
+        console.error('Ошибка удаления товара:', error);
         res.status(500).json({ error: 'Ошибка удаления товара' });
     }
 });
 
 // Продажа товара (уменьшить количество на 1)
-app.post('/api/products/:id/sell', (req, res) => {
-    const products = readProducts();
-    const productIndex = products.findIndex(p => p.id === req.params.id);
-    
-    if (productIndex === -1) {
-        return res.status(404).json({ error: 'Товар не найден' });
-    }
-    
-    if (products[productIndex].quantity <= 0) {
-        return res.status(400).json({ error: 'Товар закончился на складе' });
-    }
-    
-    products[productIndex].quantity -= 1;
-    
-    if (writeProducts(products)) {
-        res.json(products[productIndex]);
-    } else {
-        res.status(500).json({ error: 'Ошибка сохранения товара' });
+app.post('/api/products/:id/sell', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const product = await db.decreaseQuantity(req.params.id, 1);
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        if (product.quantity < 0) {
+            return res.status(400).json({ error: 'Товар закончился на складе' });
+        }
+        
+        res.json(product);
+    } catch (error) {
+        console.error('Ошибка продажи товара:', error);
+        res.status(500).json({ error: 'Ошибка продажи товара' });
     }
 });
 
 // Прием товара (увеличить количество)
-app.post('/api/products/:id/receive', (req, res) => {
-    const { quantity } = req.body;
-    const products = readProducts();
-    const productIndex = products.findIndex(p => p.id === req.params.id);
-    
-    if (productIndex === -1) {
-        return res.status(404).json({ error: 'Товар не найден' });
-    }
-    
-    const addQuantity = parseInt(quantity) || 1;
-    if (addQuantity <= 0) {
-        return res.status(400).json({ error: 'Количество должно быть больше 0' });
-    }
-    
-    products[productIndex].quantity += addQuantity;
-    
-    if (writeProducts(products)) {
-        res.json(products[productIndex]);
-    } else {
-        res.status(500).json({ error: 'Ошибка сохранения товара' });
+app.post('/api/products/:id/receive', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const { quantity } = req.body;
+        const addQuantity = parseInt(quantity) || 1;
+        
+        if (addQuantity <= 0) {
+            return res.status(400).json({ error: 'Количество должно быть больше 0' });
+        }
+        
+        const product = await db.increaseQuantity(req.params.id, addQuantity);
+        
+        if (!product) {
+            return res.status(404).json({ error: 'Товар не найден' });
+        }
+        
+        res.json(product);
+    } catch (error) {
+        console.error('Ошибка приема товара:', error);
+        res.status(500).json({ error: 'Ошибка приема товара' });
     }
 });
 
 // Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+app.get('/health', async (req, res) => {
+    let dbStatus = 'not_configured';
+    let tableCount = null;
+    let error = null;
+    
+    if (dbInitialized) {
+        try {
+            const result = await db.pool.query('SELECT COUNT(*) FROM products');
+            tableCount = parseInt(result.rows[0].count);
+            dbStatus = 'connected';
+        } catch (err) {
+            dbStatus = 'error';
+            error = err.message;
+        }
+    }
+    
+    res.json({ 
+        status: 'ok',
+        database: {
+            status: dbStatus,
+            tableCount: tableCount,
+            error: error,
+            hasDatabaseUrl: !!process.env.DATABASE_URL
+        }
+    });
+});
+
+// Endpoint для диагностики БД
+app.get('/api/debug/db', async (req, res) => {
+    if (!dbInitialized) {
+        return res.json({
+            initialized: false,
+            hasDatabaseUrl: !!process.env.DATABASE_URL,
+            message: 'База данных не инициализирована'
+        });
+    }
+    
+    try {
+        // Проверить таблицы
+        const tables = await db.pool.query(`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        `);
+        
+        // Проверить количество товаров
+        const count = await db.pool.query('SELECT COUNT(*) FROM products');
+        
+        // Проверить схему таблицы products
+        const columns = await db.pool.query(`
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'products'
+            ORDER BY ordinal_position
+        `);
+        
+        res.json({
+            initialized: true,
+            tables: tables.rows.map(r => r.table_name),
+            productsCount: parseInt(count.rows[0].count),
+            productsColumns: columns.rows,
+            databaseUrl: process.env.DATABASE_URL ? 'установлен' : 'не установлен'
+        });
+    } catch (error) {
+        res.status(500).json({
+            initialized: true,
+            error: error.message,
+            code: error.code
+        });
+    }
 });
 
 // SPA fallback - все остальные запросы на index.html
@@ -211,7 +321,20 @@ app.get('*', (req, res) => {
 });
 
 // Запуск сервера
-app.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
-    console.log(`Данные хранятся в: ${DATA_FILE}`);
+async function startServer() {
+    await initializeApp();
+    
+    app.listen(PORT, () => {
+        console.log(`Сервер запущен на порту ${PORT}`);
+        if (dbInitialized) {
+            console.log('База данных: PostgreSQL');
+        } else {
+            console.log('База данных: не настроена (установите DATABASE_URL)');
+        }
+    });
+}
+
+startServer().catch(error => {
+    console.error('Ошибка запуска сервера:', error);
+    process.exit(1);
 });
