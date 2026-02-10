@@ -219,9 +219,28 @@ function stopScanner(scannerId) {
     }
 }
 
+// Проверка доступности камеры
+async function checkCameraAvailability() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        console.log('Доступные камеры:', videoDevices.length);
+        return videoDevices.length > 0;
+    } catch (error) {
+        console.error('Ошибка проверки камеры:', error);
+        return false;
+    }
+}
+
 // Запуск сканера
 async function startScanner(readerId, onSuccess) {
     try {
+        // Проверка доступности камеры
+        const hasCamera = await checkCameraAvailability();
+        if (!hasCamera) {
+            throw new Error('Камера не найдена на устройстве');
+        }
+        
         // Остановить предыдущий сканер
         if (currentScanner) {
             await stopScanner();
@@ -254,13 +273,16 @@ async function startScanner(readerId, onSuccess) {
             // Дополнительные настройки для лучшего распознавания
             disableFlip: false // Разрешить переворот изображения
         };
+        
+        console.log('Запуск сканера с настройками:', {
+            readerId,
+            facingMode: 'environment',
+            fps: config.fps,
+            qrbox: config.qrbox
+        });
 
         await currentScanner.start(
-            { 
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            },
+            { facingMode: "environment" },
             config,
             (decodedText, decodedResult) => {
                 console.log('Штрих-код отсканирован:', decodedText);
@@ -274,7 +296,28 @@ async function startScanner(readerId, onSuccess) {
         );
     } catch (err) {
         console.error('Ошибка запуска камеры:', err);
-        showNotification('Не удалось запустить камеру. Проверьте разрешения.', 'error');
+        console.error('Детали ошибки:', {
+            name: err.name,
+            message: err.message,
+            stack: err.stack
+        });
+        
+        let errorMessage = 'Не удалось запустить камеру. ';
+        if (err.message) {
+            if (err.message.includes('Permission denied') || err.message.includes('NotAllowedError')) {
+                errorMessage += 'Разрешите доступ к камере в настройках браузера.';
+            } else if (err.message.includes('NotFoundError') || err.message.includes('No camera')) {
+                errorMessage += 'Камера не найдена. Проверьте подключение.';
+            } else if (err.message.includes('NotReadableError') || err.message.includes('TrackStartError')) {
+                errorMessage += 'Камера занята другим приложением. Закройте другие приложения.';
+            } else {
+                errorMessage += err.message;
+            }
+        } else {
+            errorMessage += 'Проверьте разрешения и настройки браузера.';
+        }
+        
+        showNotification(errorMessage, 'error');
     }
 }
 
