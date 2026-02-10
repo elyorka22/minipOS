@@ -10,6 +10,9 @@ let currentScanner = null;
 let currentBarcode = null;
 let currentProduct = null;
 
+// Корзина для продажи
+let saleCart = [];
+
 // API базовый URL - для монолита всегда /api
 const API_BASE = '/api';
 
@@ -205,12 +208,127 @@ function switchView(viewName) {
         stopScanner();
     }
 
-    // Скрыть результаты
-    document.getElementById('sale-result')?.classList.add('hidden');
+    // Очистить корзину при переключении с продажи
+    if (viewName !== 'sale') {
+        saleCart = [];
+        renderSaleCart();
+    }
     document.getElementById('receive-form')?.classList.add('hidden');
 }
 
-// Продажа товара
+// Добавить товар в корзину продажи
+function addToSaleCart(product) {
+    // Обновить информацию о товаре (на случай изменения остатка)
+    const existingItemIndex = saleCart.findIndex(item => item.id === product.id);
+    
+    if (existingItemIndex !== -1) {
+        // Товар уже в корзине - обновить информацию и увеличить количество
+        const existingItem = saleCart[existingItemIndex];
+        existingItem.quantity = product.quantity; // Обновить остаток
+        existingItem.name = product.name;
+        
+        if (existingItem.quantityInCart < product.quantity) {
+            existingItem.quantityInCart += 1;
+        } else {
+            showNotification('Недостаточно товара на складе', 'error');
+            return;
+        }
+    } else {
+        // Добавить новый товар
+        if (product.quantity <= 0) {
+            showNotification('Товар закончился на складе', 'error');
+            return;
+        }
+        saleCart.push({
+            ...product,
+            quantityInCart: 1
+        });
+    }
+    
+    renderSaleCart();
+    showNotification(`${product.name} добавлен в корзину`, 'success');
+}
+
+// Удалить товар из корзины
+function removeFromSaleCart(productId) {
+    saleCart = saleCart.filter(item => item.id !== productId);
+    renderSaleCart();
+}
+
+// Изменить количество товара в корзине
+async function updateCartItemQuantity(productId, change) {
+    const item = saleCart.find(item => item.id === productId);
+    if (!item) return;
+    
+    // Обновить информацию о товаре перед изменением количества
+    try {
+        const currentProduct = await findProductByBarcode(item.barcode);
+        if (currentProduct) {
+            item.quantity = currentProduct.quantity;
+        }
+    } catch (error) {
+        console.error('Ошибка обновления информации о товаре:', error);
+    }
+    
+    const newQuantity = item.quantityInCart + change;
+    
+    if (newQuantity <= 0) {
+        removeFromSaleCart(productId);
+        return;
+    }
+    
+    if (newQuantity > item.quantity) {
+        showNotification('Недостаточно товара на складе', 'error');
+        return;
+    }
+    
+    item.quantityInCart = newQuantity;
+    renderSaleCart();
+}
+
+// Отобразить корзину продажи
+function renderSaleCart() {
+    const cartItems = document.getElementById('sale-cart-items');
+    const cartEmpty = document.getElementById('sale-cart-empty');
+    const cartFooter = document.getElementById('sale-cart-footer');
+    const clearBtn = document.getElementById('btn-clear-cart');
+    
+    if (saleCart.length === 0) {
+        cartItems.classList.add('hidden');
+        cartEmpty.classList.remove('hidden');
+        cartFooter.classList.add('hidden');
+        clearBtn.style.display = 'none';
+        return;
+    }
+    
+    cartItems.classList.remove('hidden');
+    cartEmpty.classList.add('hidden');
+    cartFooter.classList.remove('hidden');
+    clearBtn.style.display = 'block';
+    
+    // Подсчитать общее количество
+    const totalCount = saleCart.reduce((sum, item) => sum + item.quantityInCart, 0);
+    document.getElementById('cart-total-count').textContent = totalCount;
+    
+    // Отобразить товары
+    cartItems.innerHTML = saleCart.map(item => `
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <div class="cart-item-name">${escapeHtml(item.name)}</div>
+                <div class="cart-item-barcode">${escapeHtml(item.barcode)}</div>
+                <div class="cart-item-stock">Остаток: ${item.quantity}</div>
+            </div>
+            <div class="cart-item-controls">
+                <button class="btn-quantity" onclick="updateCartItemQuantity('${item.id}', -1)">−</button>
+                <span class="cart-item-quantity">${item.quantityInCart}</span>
+                <button class="btn-quantity" onclick="updateCartItemQuantity('${item.id}', 1)">+</button>
+                <button class="btn-remove" onclick="removeFromSaleCart('${item.id}')" title="Удалить">×</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Продажа товара (обработка сканирования)
 async function handleSale(barcode) {
     const product = await findProductByBarcode(barcode);
     
@@ -224,32 +342,60 @@ async function handleSale(barcode) {
         return;
     }
 
-    if (product.quantity <= 0) {
-        showNotification('Товар закончился на складе', 'error');
-        return;
-    }
-
-    currentProduct = product;
-    currentBarcode = barcode;
-
-    // Показать результат
-    document.getElementById('sale-product-name').textContent = product.name;
-    document.getElementById('sale-stock').textContent = product.quantity;
-    document.getElementById('sale-result').classList.remove('hidden');
+    // Добавить в корзину
+    addToSaleCart(product);
 }
 
-// Подтверждение продажи
-async function confirmSale() {
-    if (!currentProduct) return;
-
+// Продать все товары из корзины
+async function sellAllFromCart() {
+    if (saleCart.length === 0) {
+        showNotification('Корзина пуста', 'error');
+        return;
+    }
+    
     try {
-        const updatedProduct = await sellProduct(currentProduct.id);
-        showNotification(`Продано: ${updatedProduct.name}. Остаток: ${updatedProduct.quantity}`, 'success');
-
-        // Сброс
-        document.getElementById('sale-result').classList.add('hidden');
-        currentProduct = null;
-        currentBarcode = null;
+        // Продать каждый товар нужное количество раз
+        const soldItems = [];
+        const errors = [];
+        
+        for (const item of saleCart) {
+            // Проверить остаток перед продажей
+            const currentProduct = await findProductByBarcode(item.barcode);
+            if (!currentProduct) {
+                errors.push(`Товар "${item.name}" больше не существует`);
+                continue;
+            }
+            
+            if (currentProduct.quantity < item.quantityInCart) {
+                errors.push(`Недостаточно "${item.name}" на складе (остаток: ${currentProduct.quantity})`);
+                continue;
+            }
+            
+            // Продать нужное количество
+            for (let i = 0; i < item.quantityInCart; i++) {
+                try {
+                    const updatedProduct = await sellProduct(item.id);
+                    soldItems.push(updatedProduct);
+                } catch (error) {
+                    errors.push(`Ошибка продажи "${item.name}"`);
+                }
+            }
+        }
+        
+        // Показать результат
+        const totalCount = soldItems.length;
+        if (totalCount > 0) {
+            showNotification(`Продано товаров: ${totalCount}`, 'success');
+        }
+        
+        if (errors.length > 0) {
+            console.error('Ошибки при продаже:', errors);
+            showNotification(`Продано: ${totalCount}, ошибок: ${errors.length}`, 'error');
+        }
+        
+        // Очистить корзину
+        saleCart = [];
+        renderSaleCart();
         
         // Обновить склад если открыт
         const activeView = document.querySelector('.view.active');
@@ -257,9 +403,21 @@ async function confirmSale() {
             await renderWarehouse();
         }
     } catch (error) {
-        // Ошибка уже обработана в sellProduct
+        console.error('Ошибка при продаже товаров:', error);
+        showNotification('Ошибка при продаже товаров', 'error');
     }
 }
+
+// Очистить корзину
+function clearSaleCart() {
+    saleCart = [];
+    renderSaleCart();
+    showNotification('Корзина очищена', 'success');
+}
+
+// Сделать функции глобальными для onclick
+window.updateCartItemQuantity = updateCartItemQuantity;
+window.removeFromSaleCart = removeFromSaleCart;
 
 // Прием товара
 async function handleReceive(barcode) {
@@ -368,6 +526,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Загрузить данные склада
     await renderWarehouse();
+    
+    // Инициализировать корзину продажи
+    renderSaleCart();
 
     // Навигация
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -391,22 +552,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // Продажа
-    document.getElementById('sale-confirm').addEventListener('click', async () => {
-        await confirmSale();
-        // Перезапустить сканер
-        setTimeout(() => {
-            startScanner('reader-sale', handleSale);
-        }, 300);
+    // Продажа - кнопка "Продать все"
+    document.getElementById('btn-sell-all').addEventListener('click', async () => {
+        await sellAllFromCart();
     });
 
-    document.getElementById('sale-cancel').addEventListener('click', () => {
-        document.getElementById('sale-result').classList.add('hidden');
-        currentProduct = null;
-        currentBarcode = null;
-        setTimeout(() => {
-            startScanner('reader-sale', handleSale);
-        }, 300);
+    // Очистить корзину
+    document.getElementById('btn-clear-cart').addEventListener('click', () => {
+        clearSaleCart();
     });
 
     // Прием

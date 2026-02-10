@@ -42,7 +42,10 @@
         <!-- Экран продажи -->
         <div id="view-sale" class="view active">
             <div class="view-header">
-                <h1>Продажа товара</h1>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <h1>Продажа товара</h1>
+                    <button id="btn-clear-cart" class="btn-secondary" style="display: none; padding: 0.5rem 1rem; font-size: 0.9rem;">Очистить</button>
+                </div>
             </div>
             <div id="scanner-container-sale" class="scanner-container">
                 <div id="reader-sale"></div>
@@ -51,11 +54,17 @@
                     <p class="scanner-hint">Наведите камеру на штрих-код</p>
                 </div>
             </div>
-            <div id="sale-result" class="result-panel hidden">
-                <h3 id="sale-product-name"></h3>
-                <p class="result-info">Остаток: <span id="sale-stock"></span></p>
-                <button id="sale-confirm" class="btn-primary">Подтвердить продажу</button>
-                <button id="sale-cancel" class="btn-secondary">Отмена</button>
+            <div id="sale-cart" class="sale-cart">
+                <div id="sale-cart-empty" class="cart-empty">
+                    <p>Корзина пуста. Отсканируйте товары.</p>
+                </div>
+                <div id="sale-cart-items" class="cart-items hidden"></div>
+                <div id="sale-cart-footer" class="cart-footer hidden">
+                    <div class="cart-total">
+                        <strong>Итого товаров: <span id="cart-total-count">0</span></strong>
+                    </div>
+                    <button id="btn-sell-all" class="btn-primary btn-large">Продать все</button>
+                </div>
             </div>
         </div>
 
