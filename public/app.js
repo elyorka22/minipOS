@@ -1059,12 +1059,18 @@ async function deleteProduct(id) {
     }
 }
 
-// Редактирование товара (глобальная функция для onclick)
-window.editProduct = async function(id) {
-    const product = allProducts.find(p => p.id === id);
+// Редактирование товара
+async function editProduct(id) {
+    // Если товар не найден в allProducts, загружаем его из API
+    let product = allProducts.find(p => p.id === id);
+    
     if (!product) {
-        showNotification('Товар не найден', 'error');
-        return;
+        try {
+            product = await apiRequest(`/products/${id}`);
+        } catch (error) {
+            showNotification('Товар не найден', 'error');
+            return;
+        }
     }
     
     // Заполнить форму редактирования
@@ -1079,12 +1085,18 @@ window.editProduct = async function(id) {
     document.getElementById('modal-edit-product').classList.remove('hidden');
 }
 
-// Подтверждение удаления товара (глобальная функция для onclick)
-window.deleteProductConfirm = async function(id) {
-    const product = allProducts.find(p => p.id === id);
+// Подтверждение удаления товара
+async function deleteProductConfirm(id) {
+    // Если товар не найден в allProducts, загружаем его из API
+    let product = allProducts.find(p => p.id === id);
+    
     if (!product) {
-        showNotification('Товар не найден', 'error');
-        return;
+        try {
+            product = await apiRequest(`/products/${id}`);
+        } catch (error) {
+            showNotification('Товар не найден', 'error');
+            return;
+        }
     }
     
     if (confirm(`Удалить товар "${product.name}"?`)) {
