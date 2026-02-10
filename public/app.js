@@ -374,27 +374,12 @@ async function startScanner(readerId, onSuccess) {
             qrbox: config.qrbox
         });
 
-        // Настройки камеры с автофокусом
-        // Используем более совместимый формат для автофокуса
+        // Настройки камеры
+        // html5-qrcode сам управляет потоком камеры
+        // Автофокус будет работать автоматически, если устройство его поддерживает
         const cameraConfig = {
             facingMode: "environment"
         };
-        
-        // Попытка включить автофокус через video constraints
-        // Это работает не на всех устройствах, но улучшает качество там, где поддерживается
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: "environment",
-                    focusMode: "continuous"
-                }
-            });
-            // Остановим этот поток, так как html5-qrcode создаст свой
-            stream.getTracks().forEach(track => track.stop());
-        } catch (e) {
-            // Автофокус не поддерживается - это нормально
-            console.log('Автофокус не поддерживается на этом устройстве');
-        }
         
         await currentScanner.start(
             cameraConfig,
