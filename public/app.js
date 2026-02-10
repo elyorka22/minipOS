@@ -944,63 +944,69 @@ async function handleProductInfo(barcode) {
     lastScannedBarcode = barcode;
     lastScanTime = now;
     
-    const product = await findProductByBarcode(barcode, 2);
+    console.log('Поиск товара по штрих-коду:', barcode);
     
-    if (!product) {
-        showNotification('Товар не найден. Попробуйте отсканировать еще раз или добавьте в склад.', 'error');
-        document.getElementById('product-info-panel').classList.add('hidden');
-        return;
-    }
-
-    // Показать информацию о товаре
-    document.getElementById('product-info-name').textContent = product.name;
-    document.getElementById('product-info-barcode').textContent = product.barcode;
-    document.getElementById('product-info-quantity').textContent = product.quantity;
-    const price = product.price || 0;
-    const purchasePrice = product.purchase_price || 0;
-    const profit = price - purchasePrice;
-    const priceEl = document.getElementById('product-info-price');
-    if (priceEl) {
-        let priceText = '';
-        if (price > 0) {
-            priceText = `Продажа: ${price.toFixed(2)} сум`;
-        if (purchasePrice > 0) {
-                priceText += ` | Закупка: ${purchasePrice.toFixed(2)} сум`;
-            if (profit > 0) {
-                    priceText += ` | Прибыль: <strong style="color: var(--success);">${profit.toFixed(2)} сум</strong>`;
-                }
-            }
-        } else {
-            priceText = 'Не указана';
+    try {
+        const product = await findProductByBarcode(barcode, 2);
+        
+        if (!product) {
+            console.log('Товар не найден в базе данных для штрих-кода:', barcode);
+            showNotification('Товар не найден. Попробуйте отсканировать еще раз или добавьте в склад.', 'error');
+            document.getElementById('product-info-panel').classList.add('hidden');
+            return;
         }
-        priceEl.innerHTML = priceText;
-    }
-    
-    // Форматирование дат
-    if (product.created_at) {
-        const createdDate = new Date(product.created_at);
-        document.getElementById('product-info-created').textContent = createdDate.toLocaleString('ru-RU');
-    } else {
-        document.getElementById('product-info-created').textContent = 'Не указана';
-    }
-    
-    if (product.updated_at) {
-        const updatedDate = new Date(product.updated_at);
-        document.getElementById('product-info-updated').textContent = updatedDate.toLocaleString('ru-RU');
-    } else {
-        document.getElementById('product-info-updated').textContent = 'Не указана';
-    }
-    
-    // Сохранить ID товара для кнопок действий
-    document.getElementById('product-info-panel').dataset.productId = product.id;
-    document.getElementById('product-info-panel').dataset.product = JSON.stringify(product);
-    
-    // Показать панель информации
-    document.getElementById('product-info-panel').classList.remove('hidden');
-    
-    // Звук и вибрация
-    playSuccessSound();
-    vibrate([50]);
+        
+        console.log('Товар найден:', product);
+        
+        // Показать информацию о товаре
+        document.getElementById('product-info-name').textContent = product.name;
+        document.getElementById('product-info-barcode').textContent = product.barcode;
+        document.getElementById('product-info-quantity').textContent = product.quantity;
+        const price = product.price || 0;
+        const purchasePrice = product.purchase_price || 0;
+        const profit = price - purchasePrice;
+        const priceEl = document.getElementById('product-info-price');
+        if (priceEl) {
+            let priceText = '';
+            if (price > 0) {
+                priceText = `Продажа: ${price.toFixed(2)} сум`;
+                if (purchasePrice > 0) {
+                    priceText += ` | Закупка: ${purchasePrice.toFixed(2)} сум`;
+                    if (profit > 0) {
+                        priceText += ` | Прибыль: <strong style="color: var(--success);">${profit.toFixed(2)} сум</strong>`;
+                    }
+                }
+            } else {
+                priceText = 'Не указана';
+            }
+            priceEl.innerHTML = priceText;
+        }
+        
+        // Форматирование дат
+        if (product.created_at) {
+            const createdDate = new Date(product.created_at);
+            document.getElementById('product-info-created').textContent = createdDate.toLocaleString('ru-RU');
+        } else {
+            document.getElementById('product-info-created').textContent = 'Не указана';
+        }
+        
+        if (product.updated_at) {
+            const updatedDate = new Date(product.updated_at);
+            document.getElementById('product-info-updated').textContent = updatedDate.toLocaleString('ru-RU');
+        } else {
+            document.getElementById('product-info-updated').textContent = 'Не указана';
+        }
+        
+        // Сохранить ID товара для кнопок действий
+        document.getElementById('product-info-panel').dataset.productId = product.id;
+        document.getElementById('product-info-panel').dataset.product = JSON.stringify(product);
+        
+        // Показать панель информации
+        document.getElementById('product-info-panel').classList.remove('hidden');
+        
+        // Звук и вибрация
+        playSuccessSound();
+        vibrate([50]);
 }
 
 // Открыть модальное окно приема товара
