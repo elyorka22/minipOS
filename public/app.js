@@ -1965,18 +1965,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const openSessionsList = document.getElementById('open-sessions-list');
     if (openSessionsList) {
         openSessionsList.addEventListener('click', async (e) => {
-            const btn = e.target.closest('.btn-session');
+            // Сначала проверяем кнопку удаления (она имеет приоритет)
             const deleteBtn = e.target.closest('.btn-delete-session');
-            
-            if (btn) {
-                const sessionId = btn.dataset.sessionId;
-                selectSession(sessionId);
-            } else if (deleteBtn) {
+            if (deleteBtn) {
                 e.preventDefault();
                 e.stopPropagation();
                 const sessionId = deleteBtn.dataset.sessionId;
                 const sessionNumber = deleteBtn.dataset.sessionNumber;
+                console.log('Удаление сессии:', sessionId, sessionNumber);
                 await deleteSessionConfirm(sessionId, sessionNumber);
+                return; // Важно: не обрабатывать дальше
+            }
+            
+            // Затем проверяем кнопку выбора сессии
+            const btn = e.target.closest('.btn-session');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const sessionId = btn.dataset.sessionId;
+                console.log('Выбор сессии:', sessionId);
+                await selectSession(sessionId);
             }
         });
     }
