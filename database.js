@@ -29,11 +29,26 @@ async function initDatabase() {
                 name VARCHAR(255) NOT NULL,
                 barcode VARCHAR(255) UNIQUE NOT NULL,
                 quantity INTEGER NOT NULL DEFAULT 0,
+                price DECIMAL(10, 2) NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
         console.log('Таблица products создана/проверена');
+
+        // Добавить поле price если его нет (для существующих БД)
+        try {
+            await pool.query(`
+                ALTER TABLE products 
+                ADD COLUMN IF NOT EXISTS price DECIMAL(10, 2) NOT NULL DEFAULT 0
+            `);
+            console.log('Поле price добавлено/проверено');
+        } catch (error) {
+            // Игнорируем ошибку если колонка уже существует
+            if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
+                console.warn('Предупреждение при добавлении поля price:', error.message);
+            }
+        }
 
         // Создать таблицу истории операций
         await pool.query(`
@@ -46,11 +61,30 @@ async function initDatabase() {
                 quantity INTEGER NOT NULL,
                 quantity_before INTEGER NOT NULL,
                 quantity_after INTEGER NOT NULL,
+                price DECIMAL(10, 2) DEFAULT 0,
+                total_amount DECIMAL(10, 2) DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
             )
         `);
         console.log('Таблица history создана/проверена');
+
+        // Добавить поля price и total_amount если их нет
+        try {
+            await pool.query(`
+                ALTER TABLE history 
+                ADD COLUMN IF NOT EXISTS price DECIMAL(10, 2) DEFAULT 0
+            `);
+            await pool.query(`
+                ALTER TABLE history 
+                ADD COLUMN IF NOT EXISTS total_amount DECIMAL(10, 2) DEFAULT 0
+            `);
+            console.log('Поля price и total_amount добавлены/проверены в history');
+        } catch (error) {
+            if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
+                console.warn('Предупреждение при добавлении полей в history:', error.message);
+            }
+        }
 
         // Создать индекс для быстрого поиска по дате
         await pool.query(`
@@ -131,10 +165,10 @@ async function getProductByBarcode(barcode) {
 // Создать товар
 async function createProduct(product) {
     try {
-        const { id, name, barcode, quantity } = product;
+        const { id, name, barcode, quantity, price = 0 } = product;
         const result = await pool.query(
-            'INSERT INTO products (id, name, barcode, quantity) VALUES ($1, $2, $3, $4) RETURNING *',
-            [id, name, barcode, quantity]
+            'INSERT INTO products (id, name, barcode, quantity, price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [id, name, barcode, quantity || 0, price || 0]
         );
         return result.rows[0];
     } catch (error) {
@@ -199,12 +233,17 @@ async function deleteProduct(id) {
 }
 
 // Сохранить операцию в историю
-async function saveHistory(product, operationType, quantity, quantityBefore, quantityAfter) {
+async function saveHistory(product, operationType, quantity, quantityBefore, quantityAfter, price = null, totalAmount = null) {
     try {
+        // Если цена не передана, берем из товара
+        const productPrice = price !== null ? price : (product.price || 0);
+        // Если общая сумма не передана, вычисляем
+        const amount = totalAmount !== null ? totalAmount : (productPrice * quantity);
+        
         await pool.query(
-            `INSERT INTO history (product_id, product_name, product_barcode, operation_type, quantity, quantity_before, quantity_after)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [product.id, product.name, product.barcode, operationType, quantity, quantityBefore, quantityAfter]
+            `INSERT INTO history (product_id, product_name, product_barcode, operation_type, quantity, quantity_before, quantity_after, price, total_amount)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [product.id, product.name, product.barcode, operationType, quantity, quantityBefore, quantityAfter, productPrice, amount]
         );
     } catch (error) {
         console.error('Ошибка сохранения истории:', error);
@@ -242,7 +281,7 @@ async function increaseQuantity(id, amount) {
 }
 
 // Уменьшить количество товара
-async function decreaseQuantity(id, amount = 1) {
+async function decreaseQuantity(id, amount = 1, price = null) {
     try {
         // Получить текущее состояние товара
         const productBefore = await getProductById(id);
@@ -251,6 +290,9 @@ async function decreaseQuantity(id, amount = 1) {
         }
         
         const quantityBefore = productBefore.quantity;
+        // Используем переданную цену или цену из товара
+        const productPrice = price !== null ? price : (productBefore.price || 0);
+        const totalAmount = productPrice * amount;
         
         const result = await pool.query(
             'UPDATE products SET quantity = GREATEST(0, quantity - $1), updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
@@ -259,8 +301,8 @@ async function decreaseQuantity(id, amount = 1) {
         
         const productAfter = result.rows[0];
         if (productAfter) {
-            // Сохранить в историю
-            await saveHistory(productAfter, 'sale', amount, quantityBefore, productAfter.quantity);
+            // Сохранить в историю с ценой
+            await saveHistory(productAfter, 'sale', amount, quantityBefore, productAfter.quantity, productPrice, totalAmount);
         }
         
         return productAfter || null;

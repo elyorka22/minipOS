@@ -116,7 +116,7 @@ app.post('/api/products', async (req, res) => {
             return res.status(503).json({ error: 'База данных не инициализирована' });
         }
 
-        const { name, barcode, quantity } = req.body;
+        const { name, barcode, quantity, price } = req.body;
         
         if (!name || !barcode) {
             return res.status(400).json({ error: 'Название и штрих-код обязательны' });
@@ -126,7 +126,8 @@ app.post('/api/products', async (req, res) => {
             id: Date.now().toString(),
             name: name.trim(),
             barcode: barcode.trim(),
-            quantity: parseInt(quantity) || 0
+            quantity: parseInt(quantity) || 0,
+            price: parseFloat(price) || 0
         };
         
         const product = await db.createProduct(newProduct);
@@ -147,12 +148,13 @@ app.put('/api/products/:id', async (req, res) => {
             return res.status(503).json({ error: 'База данных не инициализирована' });
         }
 
-        const { name, barcode, quantity } = req.body;
+        const { name, barcode, quantity, price } = req.body;
         const updates = {};
         
         if (name !== undefined) updates.name = name.trim();
         if (barcode !== undefined) updates.barcode = barcode.trim();
         if (quantity !== undefined) updates.quantity = parseInt(quantity) || 0;
+        if (price !== undefined) updates.price = parseFloat(price) || 0;
         
         const product = await db.updateProduct(req.params.id, updates);
         
