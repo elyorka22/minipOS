@@ -1450,14 +1450,20 @@ async function loadSessionCart(sessionId) {
 
 
 function showSessionsSelector() {
+    // Остановить сканер перед показом селектора сессий
+    if (currentScanner) {
+        stopScanner().catch(error => {
+            console.error('Ошибка остановки сканера:', error);
+        });
+    }
+    
     document.getElementById('sessions-selector').classList.remove('hidden');
     document.getElementById('sale-scanner-section').classList.add('hidden');
     document.getElementById('sale-cart').classList.add('hidden');
     document.getElementById('btn-clear-cart').style.display = 'none';
     document.getElementById('btn-back-to-sessions').style.display = 'none';
-    if (currentScanner) {
-        stopScanner();
-    }
+    
+    console.log('Показан селектор сессий, сканер остановлен');
 }
 
 function showSaleInterface() {
@@ -1983,10 +1989,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Запустить сканер для продажи по умолчанию
-    setTimeout(() => {
-        startScanner('reader-sale', handleSale);
-    }, 500);
+    // Не запускаем сканер автоматически - он запустится только при выборе активной сессии
 });
 
 // Обработка видимости страницы (пауза/возобновление сканера)
@@ -1996,16 +1999,25 @@ document.addEventListener('visibilitychange', () => {
             stopScanner();
         }
     } else {
+        // Возобновить сканер, если он был запущен
         const activeView = document.querySelector('.view.active');
         if (activeView) {
             const viewId = activeView.id;
             if (viewId === 'view-sale') {
-                setTimeout(() => {
-                    startScanner('reader-sale', handleSale);
-                }, 300);
+                // Запускать камеру только если есть активная сессия и показывается интерфейс продажи
+                const scannerSection = document.getElementById('sale-scanner-section');
+                if (currentSessionId && scannerSection && !scannerSection.classList.contains('hidden')) {
+                    setTimeout(() => {
+                        startScanner('reader-sale', handleSale).catch(error => {
+                            console.error('Ошибка возобновления сканера:', error);
+                        });
+                    }, 300);
+                }
             } else if (viewId === 'view-product-info') {
                 setTimeout(() => {
-                    startScanner('reader-product-info', handleProductInfo);
+                    startScanner('reader-product-info', handleProductInfo).catch(error => {
+                        console.error('Ошибка возобновления сканера:', error);
+                    });
                 }, 300);
             }
         }
