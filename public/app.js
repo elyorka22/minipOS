@@ -633,13 +633,13 @@ function renderSaleCart() {
     }).join('');
     
     // Обновить итоговую сумму в футере
-    const totalCount = saleCart.reduce((sum, item) => sum + item.quantityInCart, 0);
+    const cartTotalCount = saleCart.reduce((sum, item) => sum + item.quantityInCart, 0);
     const totalCountEl = document.getElementById('cart-total-count');
     if (totalCountEl) {
         if (totalAmount > 0) {
-            totalCountEl.innerHTML = `${totalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
+            totalCountEl.innerHTML = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
         } else {
-            totalCountEl.textContent = totalCount;
+            totalCountEl.textContent = cartTotalCount;
         }
     }
 }
