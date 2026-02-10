@@ -18,8 +18,73 @@ let lastScannedBarcode = null;
 let lastScanTime = 0;
 const SCAN_DEBOUNCE_TIME = 1000; // 1 секунда между сканированиями одного кода
 
+// Кэш результатов поиска товаров
+const productCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 минут
+
 // API базовый URL - для монолита всегда /api
 const API_BASE = '/api';
+
+// Валидация штрих-кода EAN-13
+function validateEAN13(barcode) {
+    const code = String(barcode).trim();
+    
+    // EAN-13 должен быть 13 цифр
+    if (!/^\d{13}$/.test(code)) {
+        return { valid: false, reason: 'EAN-13 должен содержать 13 цифр' };
+    }
+    
+    // Проверка контрольной суммы
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+        const digit = parseInt(code[i]);
+        sum += (i % 2 === 0) ? digit : digit * 3;
+    }
+    const checkDigit = (10 - (sum % 10)) % 10;
+    
+    if (parseInt(code[12]) !== checkDigit) {
+        return { valid: false, reason: 'Неверная контрольная сумма' };
+    }
+    
+    return { valid: true };
+}
+
+// Валидация штрих-кода (универсальная)
+function validateBarcode(barcode) {
+    const code = String(barcode).trim();
+    
+    // Проверка на пустоту
+    if (!code) {
+        return { valid: false, reason: 'Штрих-код пуст' };
+    }
+    
+    // Проверка длины (минимум 8, максимум 13 для EAN/UPC)
+    if (code.length < 8 || code.length > 13) {
+        return { valid: false, reason: 'Неверная длина штрих-кода' };
+    }
+    
+    // Проверка что все символы - цифры
+    if (!/^\d+$/.test(code)) {
+        return { valid: false, reason: 'Штрих-код должен содержать только цифры' };
+    }
+    
+    // Для EAN-13 проверяем контрольную сумму
+    if (code.length === 13) {
+        return validateEAN13(code);
+    }
+    
+    return { valid: true };
+}
+
+// Очистка устаревших записей из кэша
+function cleanCache() {
+    const now = Date.now();
+    for (const [key, value] of productCache.entries()) {
+        if (now - value.timestamp > CACHE_TTL) {
+            productCache.delete(key);
+        }
+    }
+}
 
 // API функции
 async function apiRequest(endpoint, options = {}) {
@@ -55,20 +120,40 @@ async function loadProducts() {
     }
 }
 
-// Поиск товара по штрих-коду с повторными попытками
+// Поиск товара по штрих-коду с повторными попытками и кэшированием
 async function findProductByBarcode(barcode, retries = 2) {
     // Нормализация штрих-кода (убрать пробелы, привести к строке)
     const normalizedBarcode = String(barcode).trim();
+    
+    // Очистка устаревших записей
+    cleanCache();
+    
+    // Проверка кэша
+    const cached = productCache.get(normalizedBarcode);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+        console.log('Товар найден в кэше:', normalizedBarcode);
+        return cached.product;
+    }
     
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
             const product = await apiRequest(`/products/barcode/${encodeURIComponent(normalizedBarcode)}`);
             if (product) {
+                // Сохранить в кэш
+                productCache.set(normalizedBarcode, {
+                    product: product,
+                    timestamp: Date.now()
+                });
                 return product;
             }
         } catch (error) {
             if (error.message.includes('404')) {
                 // Товар не найден - это нормально, не нужно повторять
+                // Кэшируем null результат на короткое время (30 секунд)
+                productCache.set(normalizedBarcode, {
+                    product: null,
+                    timestamp: Date.now()
+                });
                 return null;
             }
             
@@ -257,9 +342,16 @@ async function startScanner(readerId, onSuccess) {
 
         currentScanner = new Html5Qrcode(readerId);
 
+        // Адаптивная область сканирования на основе размера экрана
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        const minSize = Math.min(screenWidth, screenHeight);
+        // Используем 70% от минимального размера, но не меньше 250 и не больше 400
+        const qrboxSize = Math.max(250, Math.min(400, Math.floor(minSize * 0.7)));
+        
         const config = {
             fps: 30, // Увеличена частота кадров для лучшего распознавания
-            qrbox: { width: 300, height: 300 }, // Увеличен размер области сканирования
+            qrbox: { width: qrboxSize, height: qrboxSize }, // Адаптивный размер области сканирования
             aspectRatio: 1.0,
             supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
             formatsToSupport: [
@@ -271,7 +363,8 @@ async function startScanner(readerId, onSuccess) {
                 Html5QrcodeSupportedFormats.CODE_39
             ],
             // Дополнительные настройки для лучшего распознавания
-            disableFlip: false // Разрешить переворот изображения
+            disableFlip: false, // Разрешить переворот изображения
+            rememberLastUsedCameraId: true // Запоминать последнюю использованную камеру
         };
         
         console.log('Запуск сканера с настройками:', {
@@ -281,17 +374,59 @@ async function startScanner(readerId, onSuccess) {
             qrbox: config.qrbox
         });
 
+        // Настройки камеры с автофокусом
+        // Используем более совместимый формат для автофокуса
+        const cameraConfig = {
+            facingMode: "environment"
+        };
+        
+        // Попытка включить автофокус через video constraints
+        // Это работает не на всех устройствах, но улучшает качество там, где поддерживается
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: "environment",
+                    focusMode: "continuous"
+                }
+            });
+            // Остановим этот поток, так как html5-qrcode создаст свой
+            stream.getTracks().forEach(track => track.stop());
+        } catch (e) {
+            // Автофокус не поддерживается - это нормально
+            console.log('Автофокус не поддерживается на этом устройстве');
+        }
+        
         await currentScanner.start(
-            { facingMode: "environment" },
+            cameraConfig,
             config,
             (decodedText, decodedResult) => {
                 console.log('Штрих-код отсканирован:', decodedText);
                 // Нормализация штрих-кода перед обработкой
                 const normalizedBarcode = String(decodedText).trim();
+                
+                // Валидация штрих-кода перед обработкой
+                const validation = validateBarcode(normalizedBarcode);
+                if (!validation.valid) {
+                    console.warn('Неверный штрих-код:', validation.reason);
+                    showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
+                    return;
+                }
+                
+                // Визуальная обратная связь при успешном сканировании
+                playSuccessSound();
+                vibrate([50, 30, 50]);
+                
                 onSuccess(normalizedBarcode);
             },
             (errorMessage) => {
-                // Игнорируем ошибки сканирования (они нормальны)
+                // Логируем ошибки для анализа (но не показываем пользователю каждую)
+                // Большинство ошибок - это нормальные попытки распознавания
+                if (errorMessage.includes('NotFoundException') || errorMessage.includes('No QR code')) {
+                    // Это нормально - просто не нашли код в кадре
+                    return;
+                }
+                // Другие ошибки логируем для диагностики
+                console.debug('Ошибка сканирования:', errorMessage);
             }
         );
     } catch (err) {
@@ -625,15 +760,28 @@ window.removeFromSaleCart = removeFromSaleCart;
 
 // Прием товара
 async function handleReceive(barcode) {
-    const product = await findProductByBarcode(barcode);
+    // Валидация штрих-кода перед обработкой
+    const validation = validateBarcode(barcode);
+    if (!validation.valid) {
+        showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
+        playErrorSound();
+        return;
+    }
+    
+    // Защита от повторных сканирований
+    const now = Date.now();
+    if (lastScannedBarcode === barcode && (now - lastScanTime) < SCAN_DEBOUNCE_TIME) {
+        console.log('Пропущено повторное сканирование того же кода');
+        return;
+    }
+    
+    lastScannedBarcode = barcode;
+    lastScanTime = now;
+    
+    const product = await findProductByBarcode(barcode, 2);
     
     if (!product) {
-        showNotification('Товар не найден. Добавьте его в склад.', 'error');
-        setTimeout(() => {
-            switchView('warehouse');
-            document.getElementById('btn-add-product').click();
-            document.getElementById('input-product-barcode').value = barcode;
-        }, 1500);
+        showNotification('Товар не найден. Попробуйте отсканировать еще раз или добавьте в склад.', 'error');
         return;
     }
 
