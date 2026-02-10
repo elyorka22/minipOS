@@ -237,6 +237,19 @@ app.get('/api/sessions/:id', async (req, res) => {
     }
 });
 
+app.get('/api/sessions/:id/sales', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+        const sales = await db.getSessionSales(req.params.id);
+        res.json(sales);
+    } catch (error) {
+        console.error('Ошибка получения продаж сессии:', error);
+        res.status(500).json({ error: 'Ошибка получения продаж сессии' });
+    }
+});
+
 app.post('/api/sessions/:id/close', async (req, res) => {
     try {
         if (!dbInitialized) {

@@ -1318,11 +1318,54 @@ async function selectSession(sessionId) {
         const session = await apiRequest(`/sessions/${sessionId}`);
         currentSessionId = session.id;
         currentSessionNumber = session.session_number;
+        
+        // Загрузить продажи этой сессии для восстановления корзины
+        await loadSessionCart(sessionId);
+        
         showSaleInterface();
         showNotification(`Сессия ${currentSessionNumber} активирована`, 'success');
     } catch (error) {
         console.error('Ошибка выбора сессии:', error);
         showNotification('Ошибка выбора сессии', 'error');
+    }
+}
+
+// Загрузить корзину из продаж сессии
+async function loadSessionCart(sessionId) {
+    try {
+        const sales = await apiRequest(`/sessions/${sessionId}/sales`);
+        
+        // Группируем продажи по товарам и суммируем количество
+        const cartMap = new Map();
+        
+        for (const sale of sales) {
+            const productId = sale.product_id;
+            
+            if (cartMap.has(productId)) {
+                const item = cartMap.get(productId);
+                item.quantityInCart += sale.quantity;
+            } else {
+                // Получаем актуальную информацию о товаре
+                const product = await findProductByBarcode(sale.product_barcode);
+                if (product) {
+                    cartMap.set(productId, {
+                        ...product,
+                        quantityInCart: sale.quantity
+                    });
+                }
+            }
+        }
+        
+        // Преобразуем Map в массив
+        saleCart = Array.from(cartMap.values());
+        renderSaleCart();
+        
+        console.log(`Загружено ${saleCart.length} товаров из сессии ${currentSessionNumber}`);
+    } catch (error) {
+        console.error('Ошибка загрузки корзины сессии:', error);
+        // Если не удалось загрузить, просто очищаем корзину
+        saleCart = [];
+        renderSaleCart();
     }
 }
 

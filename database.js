@@ -628,6 +628,28 @@ async function getSessionById(id) {
     }
 }
 
+// Получить все продажи сессии (для восстановления корзины)
+async function getSessionSales(sessionId) {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                h.*,
+                p.name as product_name,
+                p.barcode as product_barcode,
+                p.price,
+                p.purchase_price
+            FROM history h
+            LEFT JOIN products p ON h.product_id = p.id
+            WHERE h.session_id = $1 AND h.operation_type = 'sale'
+            ORDER BY h.created_at ASC
+        `, [sessionId]);
+        return result.rows;
+    } catch (error) {
+        console.error('Ошибка получения продаж сессии:', error);
+        throw error;
+    }
+}
+
 // Закрыть сессию
 async function closeSession(id) {
     try {
@@ -703,6 +725,7 @@ module.exports = {
     createSession,
     getOpenSessions,
     getSessionById,
+    getSessionSales,
     closeSession,
     saveHistory,
     testConnection
