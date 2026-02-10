@@ -1766,11 +1766,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Кнопка "Назад" к выбору сессий
+    // Кнопка "Назад" к выбору сессий (не закрывает сессию)
     const btnBackToSessions = document.getElementById('btn-back-to-sessions');
     if (btnBackToSessions) {
         btnBackToSessions.addEventListener('click', async () => {
-            await closeSessionAndReturn();
+            await returnToSessionsSelector();
         });
     }
 
