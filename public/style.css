@@ -656,13 +656,79 @@ body {
     padding: 1rem;
     border-radius: 12px;
     border-left: 4px solid var(--accent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
 }
 
 .warehouse-item-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 0.5rem;
+    flex-grow: 1;
+}
+
+.warehouse-item-info {
+    flex: 1;
+}
+
+.warehouse-item-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.btn-edit, .btn-delete {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.btn-edit:hover {
+    background: var(--accent);
+    transform: scale(1.05);
+}
+
+.btn-delete:hover {
+    background: var(--error);
+    transform: scale(1.05);
+}
+
+/* Поиск */
+.search-container {
+    margin-bottom: 1rem;
+    padding: 0 1rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 2px solid var(--bg-tertiary);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.search-input::placeholder {
+    color: var(--text-secondary);
 }
 
 .warehouse-item-name {
@@ -686,6 +752,75 @@ body {
 .warehouse-empty {
     text-align: center;
     padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+/* История операций */
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0 1rem;
+}
+
+.history-item {
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: 12px;
+    border-left: 4px solid var(--accent);
+}
+
+.history-item-header {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.history-item-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.history-item-info {
+    flex: 1;
+}
+
+.history-item-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.history-item-barcode {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.history-item-date {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.history-item-details {
+    text-align: right;
+    min-width: 120px;
+}
+
+.history-item-type {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.history-item-quantity {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.history-item-stock {
+    font-size: 0.8rem;
     color: var(--text-secondary);
 }
 

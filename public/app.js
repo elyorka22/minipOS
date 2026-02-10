@@ -836,11 +836,14 @@ async function confirmReceive() {
 }
 
 // Отображение склада
-async function renderWarehouse() {
+let allProducts = []; // Храним все товары для поиска
+
+async function renderWarehouse(filteredProducts = null) {
     const list = document.getElementById('warehouse-list');
     
     try {
-        const products = await loadProducts();
+        const products = filteredProducts || await loadProducts();
+        allProducts = products; // Сохраняем для поиска
         
         if (products.length === 0) {
             list.innerHTML = '<div class="warehouse-empty">Склад пуст. Добавьте товары.</div>';
@@ -848,19 +851,180 @@ async function renderWarehouse() {
         }
 
         list.innerHTML = products.map(product => `
-            <div class="warehouse-item">
+            <div class="warehouse-item" data-product-id="${product.id}">
                 <div class="warehouse-item-header">
-                    <div>
+                    <div class="warehouse-item-info">
                         <div class="warehouse-item-name">${escapeHtml(product.name)}</div>
                         <div class="warehouse-item-barcode">Штрих-код: ${escapeHtml(product.barcode)}</div>
                     </div>
                     <div class="warehouse-item-stock">${product.quantity}</div>
+                </div>
+                <div class="warehouse-item-actions">
+                    <button class="btn-edit" onclick="editProduct('${product.id}')" title="Редактировать">✏️</button>
+                    <button class="btn-delete" onclick="deleteProductConfirm('${product.id}')" title="Удалить">🗑️</button>
                 </div>
             </div>
         `).join('');
     } catch (error) {
         list.innerHTML = '<div class="warehouse-empty">Ошибка загрузки склада</div>';
     }
+}
+
+// Обновление товара
+async function updateProduct(id, name, barcode, quantity) {
+    try {
+        return await apiRequest(`/products/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name, barcode, quantity })
+        });
+    } catch (error) {
+        if (error.message.includes('уже существует')) {
+            showNotification('Товар с таким штрих-кодом уже существует', 'error');
+        } else {
+            showNotification('Ошибка обновления товара', 'error');
+        }
+        throw error;
+    }
+}
+
+// Удаление товара
+async function deleteProduct(id) {
+    try {
+        await apiRequest(`/products/${id}`, {
+            method: 'DELETE'
+        });
+        showNotification('Товар удален', 'success');
+        await renderWarehouse();
+    } catch (error) {
+        showNotification('Ошибка удаления товара', 'error');
+        throw error;
+    }
+}
+
+// Редактирование товара
+async function editProduct(id) {
+    const product = allProducts.find(p => p.id === id);
+    if (!product) {
+        showNotification('Товар не найден', 'error');
+        return;
+    }
+    
+    // Заполнить форму редактирования
+    document.getElementById('edit-product-id').value = product.id;
+    document.getElementById('edit-product-name').value = product.name;
+    document.getElementById('edit-product-barcode').value = product.barcode;
+    document.getElementById('edit-product-quantity').value = product.quantity;
+    
+    // Показать модальное окно
+    document.getElementById('modal-edit-product').classList.remove('hidden');
+}
+
+// Подтверждение удаления товара
+async function deleteProductConfirm(id) {
+    const product = allProducts.find(p => p.id === id);
+    if (!product) {
+        showNotification('Товар не найден', 'error');
+        return;
+    }
+    
+    if (confirm(`Удалить товар "${product.name}"?`)) {
+        await deleteProduct(id);
+    }
+}
+
+// Поиск товаров
+function searchProducts(query) {
+    if (!query || query.trim() === '') {
+        renderWarehouse();
+        return;
+    }
+    
+    const searchTerm = query.toLowerCase().trim();
+    const filtered = allProducts.filter(product => 
+        product.name.toLowerCase().includes(searchTerm) ||
+        product.barcode.includes(searchTerm)
+    );
+    
+    renderWarehouse(filtered);
+}
+
+// Загрузка истории операций
+async function loadHistory() {
+    try {
+        return await apiRequest('/history?limit=200');
+    } catch (error) {
+        console.error('Ошибка загрузки истории:', error);
+        showNotification('Ошибка загрузки истории', 'error');
+        return [];
+    }
+}
+
+// Отображение истории операций
+let allHistory = [];
+
+async function renderHistory(filteredHistory = null) {
+    const list = document.getElementById('history-list');
+    
+    try {
+        const history = filteredHistory || await loadHistory();
+        allHistory = history;
+        
+        if (history.length === 0) {
+            list.innerHTML = '<div class="warehouse-empty">История операций пуста</div>';
+            return;
+        }
+
+        list.innerHTML = history.map(item => {
+            const date = new Date(item.created_at);
+            const dateStr = date.toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            const operationIcon = item.operation_type === 'sale' ? '💰' : '📦';
+            const operationText = item.operation_type === 'sale' ? 'Продажа' : 'Приемка';
+            const operationColor = item.operation_type === 'sale' ? 'var(--error)' : 'var(--success)';
+            
+            return `
+                <div class="history-item">
+                    <div class="history-item-header">
+                        <div class="history-item-icon" style="color: ${operationColor}">${operationIcon}</div>
+                        <div class="history-item-info">
+                            <div class="history-item-name">${escapeHtml(item.product_name)}</div>
+                            <div class="history-item-barcode">${escapeHtml(item.product_barcode)}</div>
+                            <div class="history-item-date">${dateStr}</div>
+                        </div>
+                        <div class="history-item-details">
+                            <div class="history-item-type">${operationText}</div>
+                            <div class="history-item-quantity">${item.quantity > 0 ? '+' : ''}${item.quantity}</div>
+                            <div class="history-item-stock">${item.quantity_before} → ${item.quantity_after}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        list.innerHTML = '<div class="warehouse-empty">Ошибка загрузки истории</div>';
+    }
+}
+
+// Поиск в истории
+function searchHistory(query) {
+    if (!query || query.trim() === '') {
+        renderHistory();
+        return;
+    }
+    
+    const searchTerm = query.toLowerCase().trim();
+    const filtered = allHistory.filter(item => 
+        item.product_name.toLowerCase().includes(searchTerm) ||
+        item.product_barcode.includes(searchTerm)
+    );
+    
+    renderHistory(filtered);
 }
 
 // Экранирование HTML
@@ -912,6 +1076,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (view === 'warehouse') {
                 // Обновить склад при открытии
                 renderWarehouse();
+            } else if (view === 'history') {
+                // Загрузить историю при открытии
+                renderHistory();
             }
         });
     });
@@ -1013,6 +1180,52 @@ document.addEventListener('DOMContentLoaded', async () => {
             await renderWarehouse();
         } catch (error) {
             // Ошибка уже обработана в addProduct
+        }
+    });
+
+    // Поиск товаров
+    document.getElementById('warehouse-search').addEventListener('input', (e) => {
+        searchProducts(e.target.value);
+    });
+
+    // Поиск в истории
+    const historySearchInput = document.getElementById('history-search');
+    if (historySearchInput) {
+        historySearchInput.addEventListener('input', (e) => {
+            searchHistory(e.target.value);
+        });
+    }
+
+    // Модальное окно редактирования
+    document.getElementById('modal-edit-close').addEventListener('click', () => {
+        document.getElementById('modal-edit-product').classList.add('hidden');
+    });
+
+    document.getElementById('form-edit-cancel').addEventListener('click', () => {
+        document.getElementById('modal-edit-product').classList.add('hidden');
+    });
+
+    // Форма редактирования товара
+    document.getElementById('form-edit-product').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const id = document.getElementById('edit-product-id').value;
+        const name = document.getElementById('edit-product-name').value;
+        const barcode = document.getElementById('edit-product-barcode').value;
+        const quantity = parseInt(document.getElementById('edit-product-quantity').value) || 0;
+
+        if (!name || !barcode) {
+            showNotification('Заполните все поля', 'error');
+            return;
+        }
+
+        try {
+            await updateProduct(id, name, barcode, quantity);
+            document.getElementById('modal-edit-product').classList.add('hidden');
+            await renderWarehouse();
+            showNotification('Товар обновлен', 'success');
+        } catch (error) {
+            // Ошибка уже обработана в updateProduct
         }
     });
 

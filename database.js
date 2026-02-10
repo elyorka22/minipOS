@@ -22,7 +22,7 @@ async function initDatabase() {
         // Убедимся, что используем правильную схему (public по умолчанию)
         await pool.query('SET search_path TO public');
         
-        // Создать таблицу
+        // Создать таблицу товаров
         await pool.query(`
             CREATE TABLE IF NOT EXISTS products (
                 id VARCHAR(255) PRIMARY KEY,
@@ -34,6 +34,35 @@ async function initDatabase() {
             )
         `);
         console.log('Таблица products создана/проверена');
+
+        // Создать таблицу истории операций
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS history (
+                id SERIAL PRIMARY KEY,
+                product_id VARCHAR(255) NOT NULL,
+                product_name VARCHAR(255) NOT NULL,
+                product_barcode VARCHAR(255) NOT NULL,
+                operation_type VARCHAR(20) NOT NULL,
+                quantity INTEGER NOT NULL,
+                quantity_before INTEGER NOT NULL,
+                quantity_after INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+            )
+        `);
+        console.log('Таблица history создана/проверена');
+
+        // Создать индекс для быстрого поиска по дате
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at DESC)
+        `);
+        console.log('Индекс idx_history_created_at создан/проверен');
+
+        // Создать индекс для поиска по товару
+        await pool.query(`
+            CREATE INDEX IF NOT EXISTS idx_history_product_id ON history(product_id)
+        `);
+        console.log('Индекс idx_history_product_id создан/проверен');
         
         // Создать индекс для быстрого поиска по штрих-коду
         await pool.query(`
@@ -169,14 +198,43 @@ async function deleteProduct(id) {
     }
 }
 
+// Сохранить операцию в историю
+async function saveHistory(product, operationType, quantity, quantityBefore, quantityAfter) {
+    try {
+        await pool.query(
+            `INSERT INTO history (product_id, product_name, product_barcode, operation_type, quantity, quantity_before, quantity_after)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [product.id, product.name, product.barcode, operationType, quantity, quantityBefore, quantityAfter]
+        );
+    } catch (error) {
+        console.error('Ошибка сохранения истории:', error);
+        // Не прерываем выполнение, если не удалось сохранить историю
+    }
+}
+
 // Увеличить количество товара
 async function increaseQuantity(id, amount) {
     try {
+        // Получить текущее состояние товара
+        const productBefore = await getProductById(id);
+        if (!productBefore) {
+            return null;
+        }
+        
+        const quantityBefore = productBefore.quantity;
+        
         const result = await pool.query(
             'UPDATE products SET quantity = quantity + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
             [amount, id]
         );
-        return result.rows[0] || null;
+        
+        const productAfter = result.rows[0];
+        if (productAfter) {
+            // Сохранить в историю
+            await saveHistory(productAfter, 'receive', amount, quantityBefore, productAfter.quantity);
+        }
+        
+        return productAfter || null;
     } catch (error) {
         console.error('Ошибка увеличения количества:', error);
         throw error;
@@ -186,13 +244,85 @@ async function increaseQuantity(id, amount) {
 // Уменьшить количество товара
 async function decreaseQuantity(id, amount = 1) {
     try {
+        // Получить текущее состояние товара
+        const productBefore = await getProductById(id);
+        if (!productBefore) {
+            return null;
+        }
+        
+        const quantityBefore = productBefore.quantity;
+        
         const result = await pool.query(
             'UPDATE products SET quantity = GREATEST(0, quantity - $1), updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
             [amount, id]
         );
-        return result.rows[0] || null;
+        
+        const productAfter = result.rows[0];
+        if (productAfter) {
+            // Сохранить в историю
+            await saveHistory(productAfter, 'sale', amount, quantityBefore, productAfter.quantity);
+        }
+        
+        return productAfter || null;
     } catch (error) {
         console.error('Ошибка уменьшения количества:', error);
+        throw error;
+    }
+}
+
+// Получить историю операций
+async function getHistory(limit = 100, offset = 0, productId = null) {
+    try {
+        let query = 'SELECT * FROM history';
+        const params = [];
+        let paramCount = 1;
+        
+        if (productId) {
+            query += ` WHERE product_id = $${paramCount++}`;
+            params.push(productId);
+        }
+        
+        query += ` ORDER BY created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
+        params.push(limit, offset);
+        
+        const result = await pool.query(query, params);
+        return result.rows;
+    } catch (error) {
+        console.error('Ошибка получения истории:', error);
+        throw error;
+    }
+}
+
+// Получить статистику продаж
+async function getSalesStats(startDate = null, endDate = null) {
+    try {
+        let query = `
+            SELECT 
+                operation_type,
+                COUNT(*) as count,
+                SUM(quantity) as total_quantity,
+                DATE(created_at) as date
+            FROM history
+            WHERE operation_type = 'sale'
+        `;
+        const params = [];
+        let paramCount = 1;
+        
+        if (startDate) {
+            query += ` AND created_at >= $${paramCount++}`;
+            params.push(startDate);
+        }
+        if (endDate) {
+            query += ` AND created_at <= $${paramCount++}`;
+            params.push(endDate);
+        }
+        
+        query += ` GROUP BY operation_type, DATE(created_at) ORDER BY date DESC`;
+        
+        const result = await pool.query(query, params);
+        return result.rows;
+    } catch (error) {
+        console.error('Ошибка получения статистики:', error);
         throw error;
     }
 }
@@ -219,6 +349,8 @@ module.exports = {
     deleteProduct,
     increaseQuantity,
     decreaseQuantity,
+    getHistory,
+    getSalesStats,
     testConnection
 };
 

@@ -241,6 +241,43 @@ app.post('/api/products/:id/receive', async (req, res) => {
     }
 });
 
+// Получить историю операций
+app.get('/api/history', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const limit = parseInt(req.query.limit) || 100;
+        const offset = parseInt(req.query.offset) || 0;
+        const productId = req.query.productId || null;
+
+        const history = await db.getHistory(limit, offset, productId);
+        res.json(history);
+    } catch (error) {
+        console.error('Ошибка получения истории:', error);
+        res.status(500).json({ error: 'Ошибка получения истории' });
+    }
+});
+
+// Получить статистику продаж
+app.get('/api/stats', async (req, res) => {
+    try {
+        if (!dbInitialized) {
+            return res.status(503).json({ error: 'База данных не инициализирована' });
+        }
+
+        const startDate = req.query.startDate || null;
+        const endDate = req.query.endDate || null;
+
+        const stats = await db.getSalesStats(startDate, endDate);
+        res.json(stats);
+    } catch (error) {
+        console.error('Ошибка получения статистики:', error);
+        res.status(500).json({ error: 'Ошибка получения статистики' });
+    }
+});
+
 // Health check
 app.get('/health', async (req, res) => {
     let dbStatus = 'not_configured';

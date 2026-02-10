@@ -49,6 +49,10 @@
                 <span class="btn-icon">📋</span>
                 <span class="btn-text">Склад</span>
             </button>
+            <button id="btn-history" class="nav-btn" data-view="history">
+                <span class="btn-icon">📊</span>
+                <span class="btn-text">История</span>
+            </button>
         </nav>
 
         <!-- Экран продажи -->
@@ -114,6 +118,9 @@
                 <h1>Склад</h1>
                 <button id="btn-add-product" class="btn-primary">+ Добавить товар</button>
             </div>
+            <div class="search-container">
+                <input type="text" id="warehouse-search" class="search-input" placeholder="Поиск по названию или штрих-коду...">
+            </div>
             <div id="warehouse-list" class="warehouse-list">
                 <!-- Список товаров будет здесь -->
             </div>
@@ -149,6 +156,48 @@
                     <div class="modal-actions">
                         <button type="submit" class="btn-primary">Добавить</button>
                         <button type="button" id="form-cancel" class="btn-secondary">Отмена</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Экран истории операций -->
+        <div id="view-history" class="view">
+            <div class="view-header">
+                <h1>История операций</h1>
+            </div>
+            <div class="search-container">
+                <input type="text" id="history-search" class="search-input" placeholder="Поиск по названию товара или штрих-коду...">
+            </div>
+            <div id="history-list" class="history-list">
+                <!-- Список операций будет здесь -->
+            </div>
+        </div>
+
+        <!-- Модальное окно редактирования товара -->
+        <div id="modal-edit-product" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Редактировать товар</h2>
+                    <button id="modal-edit-close" class="modal-close">×</button>
+                </div>
+                <form id="form-edit-product">
+                    <input type="hidden" id="edit-product-id">
+                    <label>
+                        Название:
+                        <input type="text" id="edit-product-name" required class="input-field">
+                    </label>
+                    <label>
+                        Штрих-код:
+                        <input type="text" id="edit-product-barcode" required class="input-field">
+                    </label>
+                    <label>
+                        Количество:
+                        <input type="number" id="edit-product-quantity" min="0" value="0" class="input-field">
+                    </label>
+                    <div class="modal-actions">
+                        <button type="submit" class="btn-primary">Сохранить</button>
+                        <button type="button" id="form-edit-cancel" class="btn-secondary">Отмена</button>
                     </div>
                 </form>
             </div>
