@@ -13,6 +13,11 @@ let currentProduct = null;
 // Корзина для продажи
 let saleCart = [];
 
+// Защита от повторных сканирований одного штрих-кода
+let lastScannedBarcode = null;
+let lastScanTime = 0;
+const SCAN_DEBOUNCE_TIME = 1000; // 1 секунда между сканированиями одного кода
+
 // API базовый URL - для монолита всегда /api
 const API_BASE = '/api';
 
@@ -50,17 +55,36 @@ async function loadProducts() {
     }
 }
 
-// Поиск товара по штрих-коду
-async function findProductByBarcode(barcode) {
-    try {
-        return await apiRequest(`/products/barcode/${encodeURIComponent(barcode)}`);
-    } catch (error) {
-        if (error.message.includes('404')) {
+// Поиск товара по штрих-коду с повторными попытками
+async function findProductByBarcode(barcode, retries = 2) {
+    // Нормализация штрих-кода (убрать пробелы, привести к строке)
+    const normalizedBarcode = String(barcode).trim();
+    
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const product = await apiRequest(`/products/barcode/${encodeURIComponent(normalizedBarcode)}`);
+            if (product) {
+                return product;
+            }
+        } catch (error) {
+            if (error.message.includes('404')) {
+                // Товар не найден - это нормально, не нужно повторять
+                return null;
+            }
+            
+            // Ошибка сети или сервера - повторить попытку
+            if (attempt < retries) {
+                console.log(`Попытка ${attempt + 1} не удалась, повторяю...`);
+                await new Promise(resolve => setTimeout(resolve, 300)); // Задержка 300мс
+                continue;
+            }
+            
+            console.error('Ошибка поиска товара после всех попыток:', error);
             return null;
         }
-        console.error('Ошибка поиска товара:', error);
-        return null;
     }
+    
+    return null;
 }
 
 // Добавление товара
@@ -215,19 +239,34 @@ async function startScanner(readerId, onSuccess) {
         currentScanner = new Html5Qrcode(readerId);
 
         const config = {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
+            fps: 30, // Увеличена частота кадров для лучшего распознавания
+            qrbox: { width: 300, height: 300 }, // Увеличен размер области сканирования
             aspectRatio: 1.0,
             supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-            formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13]
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39
+            ],
+            // Дополнительные настройки для лучшего распознавания
+            disableFlip: false // Разрешить переворот изображения
         };
 
         await currentScanner.start(
-            { facingMode: "environment" },
+            { 
+                facingMode: "environment",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
             config,
             (decodedText, decodedResult) => {
                 console.log('Штрих-код отсканирован:', decodedText);
-                onSuccess(decodedText);
+                // Нормализация штрих-кода перед обработкой
+                const normalizedBarcode = String(decodedText).trim();
+                onSuccess(normalizedBarcode);
             },
             (errorMessage) => {
                 // Игнорируем ошибки сканирования (они нормальны)
@@ -417,16 +456,51 @@ function highlightLastCartItem() {
 
 // Продажа товара (обработка сканирования)
 async function handleSale(barcode) {
-    const product = await findProductByBarcode(barcode);
+    // Защита от повторных сканирований одного кода
+    const now = Date.now();
+    if (lastScannedBarcode === barcode && (now - lastScanTime) < SCAN_DEBOUNCE_TIME) {
+        console.log('Пропущено повторное сканирование того же кода');
+        return;
+    }
+    
+    lastScannedBarcode = barcode;
+    lastScanTime = now;
+    
+    // Показать индикатор загрузки
+    showNotification('Поиск товара...', 'success');
+    
+    // Поиск товара с повторными попытками
+    const product = await findProductByBarcode(barcode, 2);
     
     if (!product) {
-        showNotification('Товар не найден. Добавьте его в склад.', 'error');
-        setTimeout(() => {
-            switchView('warehouse');
-            document.getElementById('btn-add-product').click();
-            document.getElementById('input-product-barcode').value = barcode;
-        }, 1500);
+        // Показать уведомление
+        showNotification('Товар не найден. Попробуйте отсканировать еще раз.', 'error');
+        
+        // Показать подсказку с кнопкой добавления (не открывать автоматически)
+        const prompt = document.getElementById('sale-add-product-prompt');
+        const addBtn = document.getElementById('btn-add-missing-product');
+        
+        // Сохранить штрих-код для кнопки
+        if (addBtn) {
+            addBtn.dataset.barcode = barcode;
+        }
+        
+        if (prompt) {
+            prompt.classList.remove('hidden');
+            
+            // Скрыть подсказку через 5 секунд или при следующем сканировании
+            setTimeout(() => {
+                prompt.classList.add('hidden');
+            }, 5000);
+        }
+        
         return;
+    }
+    
+    // Скрыть подсказку если товар найден
+    const prompt = document.getElementById('sale-add-product-prompt');
+    if (prompt) {
+        prompt.classList.add('hidden');
     }
 
     // Добавить в корзину
@@ -647,6 +721,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Очистить корзину
     document.getElementById('btn-clear-cart').addEventListener('click', () => {
         clearSaleCart();
+    });
+
+    // Кнопка добавления товара из подсказки
+    document.getElementById('btn-add-missing-product').addEventListener('click', () => {
+        const barcode = document.getElementById('btn-add-missing-product').dataset.barcode;
+        if (barcode) {
+            document.getElementById('sale-add-product-prompt').classList.add('hidden');
+            switchView('warehouse');
+            document.getElementById('btn-add-product').click();
+            document.getElementById('input-product-barcode').value = barcode;
+        }
     });
 
     // Прием

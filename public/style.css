@@ -385,6 +385,29 @@ body {
     font-size: 1.1rem;
 }
 
+/* Подсказка добавления товара */
+.add-product-prompt {
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-top: 1rem;
+    text-align: center;
+    border-left: 4px solid var(--warning);
+}
+
+.add-product-prompt p {
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.prompt-hint {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1rem !important;
+    font-weight: normal !important;
+}
+
 /* Результаты */
 .result-panel,
 .form-panel {
