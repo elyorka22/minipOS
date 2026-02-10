@@ -1374,6 +1374,16 @@ async function closeSessionAndReturn() {
     }
 }
 
+async function returnToSessionsSelector() {
+    // Просто вернуться к выбору сессий, НЕ закрывая сессию
+    saleCart = [];
+    renderSaleCart();
+    currentSessionId = null;
+    currentSessionNumber = null;
+    await loadOpenSessions();
+    showSessionsSelector();
+}
+
 // Загрузка статистики
 async function loadStats(period = 'day') {
     try {
