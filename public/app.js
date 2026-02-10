@@ -641,10 +641,8 @@ function renderSaleCart() {
         cartItems.innerHTML = saleCart.map((item, index) => {
             // Безопасная обработка данных товара
             const price = parseFloat(item.price) || 0;
-            const purchasePrice = parseFloat(item.purchase_price) || 0;
             const quantityInCart = parseInt(item.quantityInCart) || 1;
             const itemTotal = price * quantityInCart;
-            const itemProfit = (price - purchasePrice) * quantityInCart;
             
             return `
             <div class="cart-item" data-item-id="${item.id}" data-item-index="${index}">
@@ -652,7 +650,6 @@ function renderSaleCart() {
                     <div class="cart-item-name">${escapeHtml(item.name || 'Без названия')}</div>
                     <div class="cart-item-details">
                         ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} ₽ × ${quantityInCart} = <strong>${itemTotal.toFixed(2)} ₽</strong></span>` : '<span class="cart-item-price">Цена не указана</span>'}
-                        ${itemProfit > 0 ? `<span class="cart-item-profit">Прибыль: ${itemProfit.toFixed(2)} ₽</span>` : ''}
                     </div>
                 </div>
                 <div class="cart-item-controls">
