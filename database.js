@@ -218,7 +218,7 @@ async function createProduct(product) {
 // Обновить товар
 async function updateProduct(id, updates) {
     try {
-        const { name, barcode, quantity } = updates;
+        const { name, barcode, quantity, price, purchase_price } = updates;
         const fields = [];
         const values = [];
         let paramCount = 1;
@@ -235,8 +235,21 @@ async function updateProduct(id, updates) {
             fields.push(`quantity = $${paramCount++}`);
             values.push(quantity);
         }
+        if (price !== undefined) {
+            fields.push(`price = $${paramCount++}`);
+            values.push(parseFloat(price) || 0);
+        }
+        if (purchase_price !== undefined) {
+            fields.push(`purchase_price = $${paramCount++}`);
+            values.push(parseFloat(purchase_price) || 0);
+        }
 
-        fields.push(`updated_at = CURRENT_TIMESTAMP`);
+        if (fields.length === 0) {
+            // Если нет полей для обновления, просто обновим updated_at
+            fields.push(`updated_at = CURRENT_TIMESTAMP`);
+        } else {
+            fields.push(`updated_at = CURRENT_TIMESTAMP`);
+        }
         values.push(id);
 
         const query = `UPDATE products SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
