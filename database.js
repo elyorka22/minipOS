@@ -248,17 +248,20 @@ async function deleteProduct(id) {
 }
 
 // Сохранить операцию в историю
-async function saveHistory(product, operationType, quantity, quantityBefore, quantityAfter, price = null, totalAmount = null) {
+async function saveHistory(product, operationType, quantity, quantityBefore, quantityAfter, price = null, totalAmount = null, purchasePrice = null) {
     try {
         // Если цена не передана, берем из товара
         const productPrice = price !== null ? price : (product.price || 0);
+        const productPurchasePrice = purchasePrice !== null ? purchasePrice : (product.purchase_price || 0);
         // Если общая сумма не передана, вычисляем
         const amount = totalAmount !== null ? totalAmount : (productPrice * quantity);
+        // Рассчитываем прибыль только для продаж
+        const profit = operationType === 'sale' ? (productPrice - productPurchasePrice) * quantity : 0;
         
         await pool.query(
-            `INSERT INTO history (product_id, product_name, product_barcode, operation_type, quantity, quantity_before, quantity_after, price, total_amount)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [product.id, product.name, product.barcode, operationType, quantity, quantityBefore, quantityAfter, productPrice, amount]
+            `INSERT INTO history (product_id, product_name, product_barcode, operation_type, quantity, quantity_before, quantity_after, price, purchase_price, total_amount, profit)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            [product.id, product.name, product.barcode, operationType, quantity, quantityBefore, quantityAfter, productPrice, productPurchasePrice, amount, profit]
         );
     } catch (error) {
         console.error('Ошибка сохранения истории:', error);

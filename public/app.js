@@ -188,9 +188,11 @@ async function addProduct(name, barcode, quantity, price, purchase_price) {
 }
 
 // Продажа товара (уменьшить на 1)
-async function sellProduct(productId, price = null) {
+async function sellProduct(productId, price = null, purchasePrice = null) {
     try {
-        const body = price !== null ? { price } : {};
+        const body = {};
+        if (price !== null) body.price = price;
+        if (purchasePrice !== null) body.purchase_price = purchasePrice;
         return await apiRequest(`/products/${productId}/sell`, {
             method: 'POST',
             body: JSON.stringify(body)
@@ -612,7 +614,9 @@ function renderSaleCart() {
     // Отобразить товары
     cartItems.innerHTML = saleCart.map((item, index) => {
         const price = item.price || 0;
+        const purchasePrice = item.purchase_price || 0;
         const itemTotal = price * item.quantityInCart;
+        const itemProfit = (price - purchasePrice) * item.quantityInCart;
         return `
         <div class="cart-item" data-item-id="${item.id}" data-item-index="${index}">
             <div class="cart-item-info">
@@ -621,6 +625,7 @@ function renderSaleCart() {
                 <div class="cart-item-details">
                     <span class="cart-item-stock">Остаток: ${item.quantity}</span>
                     ${price > 0 ? `<span class="cart-item-price">${price.toFixed(2)} ₽ × ${item.quantityInCart} = ${itemTotal.toFixed(2)} ₽</span>` : ''}
+                    ${itemProfit > 0 ? `<span class="cart-item-profit">Прибыль: ${itemProfit.toFixed(2)} ₽</span>` : ''}
                 </div>
             </div>
             <div class="cart-item-controls">
@@ -633,12 +638,23 @@ function renderSaleCart() {
         `;
     }).join('');
     
+    // Подсчитать общую прибыль
+    const totalProfit = saleCart.reduce((sum, item) => {
+        const price = item.price || 0;
+        const purchasePrice = item.purchase_price || 0;
+        return sum + ((price - purchasePrice) * item.quantityInCart);
+    }, 0);
+    
     // Обновить итоговую сумму в футере
     const cartTotalCount = saleCart.reduce((sum, item) => sum + item.quantityInCart, 0);
     const totalCountEl = document.getElementById('cart-total-count');
     if (totalCountEl) {
         if (totalAmount > 0) {
-            totalCountEl.innerHTML = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
+            let summaryText = `${cartTotalCount} товаров на сумму <strong>${totalAmount.toFixed(2)} ₽</strong>`;
+            if (totalProfit > 0) {
+                summaryText += `<br>Прибыль: <strong style="color: var(--success);">${totalProfit.toFixed(2)} ₽</strong>`;
+            }
+            totalCountEl.innerHTML = summaryText;
         } else {
             totalCountEl.textContent = cartTotalCount;
         }
@@ -754,12 +770,13 @@ async function sellAllFromCart() {
             // Продать нужное количество за один раз
             try {
                 const price = currentProduct.price || 0;
+                const purchasePrice = currentProduct.purchase_price || 0;
                 const itemTotal = price * item.quantityInCart;
                 totalAmount += itemTotal;
                 
                 // Продать товар нужное количество раз
                 for (let i = 0; i < item.quantityInCart; i++) {
-                    const updatedProduct = await sellProduct(item.id, price);
+                    const updatedProduct = await sellProduct(item.id, price, purchasePrice);
                     soldItems.push(updatedProduct);
                 }
             } catch (error) {
@@ -840,9 +857,23 @@ async function handleProductInfo(barcode) {
     document.getElementById('product-info-barcode').textContent = product.barcode;
     document.getElementById('product-info-quantity').textContent = product.quantity;
     const price = product.price || 0;
+    const purchasePrice = product.purchase_price || 0;
+    const profit = price - purchasePrice;
     const priceEl = document.getElementById('product-info-price');
     if (priceEl) {
-        priceEl.textContent = price > 0 ? `${price.toFixed(2)} ₽` : 'Не указана';
+        let priceText = '';
+        if (price > 0) {
+            priceText = `Продажа: ${price.toFixed(2)} ₽`;
+            if (purchasePrice > 0) {
+                priceText += ` | Закупка: ${purchasePrice.toFixed(2)} ₽`;
+                if (profit > 0) {
+                    priceText += ` | Прибыль: <strong style="color: var(--success);">${profit.toFixed(2)} ₽</strong>`;
+                }
+            }
+        } else {
+            priceText = 'Не указана';
+        }
+        priceEl.innerHTML = priceText;
     }
     
     // Форматирование дат
@@ -980,7 +1011,9 @@ async function renderWarehouse(filteredProducts = null) {
                     <div class="warehouse-item-info">
                         <div class="warehouse-item-name">${escapeHtml(product.name)}</div>
                         <div class="warehouse-item-barcode">Штрих-код: ${escapeHtml(product.barcode)}</div>
-                        ${product.price > 0 ? `<div class="warehouse-item-price">${product.price.toFixed(2)} ₽</div>` : ''}
+                        ${product.price > 0 ? `<div class="warehouse-item-price">Продажа: ${product.price.toFixed(2)} ₽</div>` : ''}
+                        ${product.purchase_price > 0 ? `<div class="warehouse-item-purchase-price">Закупка: ${product.purchase_price.toFixed(2)} ₽</div>` : ''}
+                        ${product.price > 0 && product.purchase_price > 0 ? `<div class="warehouse-item-profit">Прибыль: ${(product.price - product.purchase_price).toFixed(2)} ₽</div>` : ''}
                     </div>
                     <div class="warehouse-item-stock">${product.quantity}</div>
                 </div>
@@ -1040,6 +1073,7 @@ window.editProduct = async function(id) {
     document.getElementById('edit-product-barcode').value = product.barcode;
     document.getElementById('edit-product-quantity').value = product.quantity;
     document.getElementById('edit-product-price').value = product.price || 0;
+    document.getElementById('edit-product-purchase-price').value = product.purchase_price || 0;
     
     // Показать модальное окно
     document.getElementById('modal-edit-product').classList.remove('hidden');
@@ -1328,6 +1362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const barcode = document.getElementById('input-product-barcode').value;
         const quantity = document.getElementById('input-product-quantity').value;
         const price = document.getElementById('input-product-price').value;
+        const purchase_price = document.getElementById('input-product-purchase-price').value;
 
         if (!name || !barcode) {
             showNotification('Заполните все обязательные поля', 'error');
@@ -1335,7 +1370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            await addProduct(name, barcode, quantity, price);
+            await addProduct(name, barcode, quantity, price, purchase_price);
             document.getElementById('modal-add-product').classList.add('hidden');
             if (currentScanner) {
                 stopScanner();
@@ -1377,6 +1412,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const barcode = document.getElementById('edit-product-barcode').value;
         const quantity = parseInt(document.getElementById('edit-product-quantity').value) || 0;
         const price = parseFloat(document.getElementById('edit-product-price').value) || 0;
+        const purchase_price = parseFloat(document.getElementById('edit-product-purchase-price').value) || 0;
 
         if (!name || !barcode) {
             showNotification('Заполните все обязательные поля', 'error');
@@ -1384,7 +1420,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            await updateProduct(id, name, barcode, quantity, price);
+            await updateProduct(id, name, barcode, quantity, price, purchase_price);
             document.getElementById('modal-edit-product').classList.add('hidden');
             await renderWarehouse();
             showNotification('Товар обновлен', 'success');
