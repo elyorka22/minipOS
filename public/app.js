@@ -349,11 +349,37 @@ async function startScanner(readerId, onSuccess) {
         
         // Проверить, что элемент видим (не скрыт)
         const container = readerElement.closest('.scanner-container, .scanner-container-small');
+        const parentSection = readerElement.closest('[id*="scanner-section"], [id*="view-"]');
+        
+        console.log('Проверка видимости элементов:', {
+            readerId,
+            containerExists: !!container,
+            containerHidden: container ? container.classList.contains('hidden') : false,
+            parentSectionExists: !!parentSection,
+            parentSectionHidden: parentSection ? parentSection.classList.contains('hidden') : false,
+            readerElementVisible: readerElement.offsetParent !== null,
+            readerElementDisplay: window.getComputedStyle(readerElement).display,
+            readerElementVisibility: window.getComputedStyle(readerElement).visibility
+        });
+        
+        // Показать все родительские контейнеры, если они скрыты
+        if (parentSection && parentSection.classList.contains('hidden')) {
+            console.warn('Родительская секция скрыта, показываем её');
+            parentSection.classList.remove('hidden');
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
         if (container && container.classList.contains('hidden')) {
-            console.warn(`Контейнер сканера скрыт, пытаемся показать его`);
+            console.warn('Контейнер сканера скрыт, показываем его');
             container.classList.remove('hidden');
-            // Дать время DOM обновиться
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        // Финальная проверка видимости
+        const isVisible = readerElement.offsetParent !== null;
+        if (!isVisible) {
+            console.error('Элемент сканера все еще не видим после попыток показать');
+            throw new Error(`Элемент #${readerId} не видим. Убедитесь, что он не скрыт CSS.`);
         }
 
         // Очистить предыдущий контент
@@ -1444,19 +1470,47 @@ function showSaleInterface() {
     document.getElementById('btn-back-to-sessions').style.display = 'block';
     document.getElementById('btn-clear-cart').style.display = saleCart.length > 0 ? 'block' : 'none';
     
-    // Запустить сканер после небольшой задержки, чтобы DOM обновился
-    setTimeout(() => {
+    // Запустить сканер после задержки, чтобы DOM обновился и элемент стал видимым
+    setTimeout(async () => {
         const readerElement = document.getElementById('reader-sale');
-        if (readerElement) {
-            startScanner('reader-sale', handleSale).catch(error => {
-                console.error('Ошибка запуска сканера:', error);
-                showNotification('Не удалось запустить камеру. Проверьте разрешения.', 'error');
-            });
-        } else {
+        const scannerContainer = document.getElementById('scanner-container-sale');
+        
+        console.log('Проверка элементов перед запуском сканера:', {
+            readerElement: !!readerElement,
+            scannerContainer: !!scannerContainer,
+            scannerSectionVisible: scannerSection ? !scannerSection.classList.contains('hidden') : false,
+            readerElementVisible: readerElement ? readerElement.offsetParent !== null : false
+        });
+        
+        if (!readerElement) {
             console.error('Элемент reader-sale не найден в DOM');
             showNotification('Ошибка: элемент сканера не найден', 'error');
+            return;
         }
-    }, 500);
+        
+        // Убедиться, что контейнер видим
+        if (scannerContainer && scannerContainer.classList.contains('hidden')) {
+            scannerContainer.classList.remove('hidden');
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        // Проверить видимость элемента
+        const isVisible = readerElement.offsetParent !== null;
+        if (!isVisible) {
+            console.warn('Элемент reader-sale не видим, пытаемся принудительно показать');
+            scannerSection?.classList.remove('hidden');
+            scannerContainer?.classList.remove('hidden');
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
+        try {
+            await startScanner('reader-sale', handleSale);
+            console.log('✓ Сканер успешно запущен в showSaleInterface');
+        } catch (error) {
+            console.error('Ошибка запуска сканера:', error);
+            showNotification('Не удалось запустить камеру. Проверьте разрешения.', 'error');
+        }
+    }, 800); // Увеличена задержка для надежности
 }
 
 async function closeSessionAndReturn() {
