@@ -132,6 +132,40 @@ async function initDatabase() {
                 ADD COLUMN IF NOT EXISTS total_amount DECIMAL(10, 2) DEFAULT 0
             `);
             
+            // Добавить поле purchase_price если его нет
+            const purchasePriceCheck = await pool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'history' 
+                AND column_name = 'purchase_price'
+            `);
+            
+            if (purchasePriceCheck.rows.length === 0) {
+                await pool.query(`
+                    ALTER TABLE history 
+                    ADD COLUMN purchase_price DECIMAL(10, 2) DEFAULT 0
+                `);
+                console.log('✓ Поле purchase_price добавлено в history');
+            }
+            
+            // Добавить поле profit если его нет
+            const profitCheck = await pool.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'history' 
+                AND column_name = 'profit'
+            `);
+            
+            if (profitCheck.rows.length === 0) {
+                await pool.query(`
+                    ALTER TABLE history 
+                    ADD COLUMN profit DECIMAL(10, 2) DEFAULT 0
+                `);
+                console.log('✓ Поле profit добавлено в history');
+            }
+            
             // Добавить поле session_id если его нет
             const sessionIdCheck = await pool.query(`
                 SELECT column_name 
@@ -161,7 +195,7 @@ async function initDatabase() {
                 }
                 console.log('✓ Поле session_id добавлено в history');
             }
-            console.log('Поля price и total_amount добавлены/проверены в history');
+            console.log('Поля price, total_amount, purchase_price, profit добавлены/проверены в history');
         } catch (error) {
             if (!error.message.includes('already exists') && !error.message.includes('duplicate column')) {
                 console.warn('Предупреждение при добавлении полей в history:', error.message);
