@@ -397,39 +397,17 @@ async function startScanner(readerId, onSuccess) {
         
         // Обработчик успешного распознавания
         const onScanSuccess = (decodedText, decodedResult) => {
-            // Защита от повторных срабатываний того же кода
-            const now = Date.now();
+            // Простая нормализация
             const normalizedBarcode = String(decodedText).trim();
-            
-            // Проверка debounce на уровне обработчика
-            if (lastScannedBarcode === normalizedBarcode && (now - lastScanTime) < SCAN_DEBOUNCE_TIME) {
-                console.log('Пропущено повторное распознавание (debounce):', normalizedBarcode);
-                return;
-            }
-            
-            // Обновляем время последнего сканирования
-            lastScannedBarcode = normalizedBarcode;
-            lastScanTime = now;
             
             console.log('=== Штрих-код распознан ===');
             console.log('Текст:', decodedText);
-            console.log('Тип:', decodedResult?.result?.format);
-            console.log('Длина:', decodedText?.length);
             console.log('Нормализованный:', normalizedBarcode);
             
-            // Валидация штрих-кода перед обработкой
-            const validation = validateBarcode(normalizedBarcode);
-            console.log('Валидация:', validation);
-            
-            if (!validation.valid) {
-                console.warn('Штрих-код не прошел валидацию:', validation.reason);
-                // Показываем предупреждение, но не блокируем обработку для коротких кодов
-                if (normalizedBarcode.length < 4) {
-                    showNotification(`Неверный штрих-код: ${validation.reason}`, 'error');
-                    return;
-                }
-                // Для остальных случаев - предупреждение, но продолжаем
-                console.warn('Продолжаем обработку несмотря на предупреждение валидации');
+            // Минимальная проверка - только что код не пустой
+            if (!normalizedBarcode || normalizedBarcode.length < 3) {
+                console.warn('Штрих-код слишком короткий, пропускаем');
+                return;
             }
             
             // Визуальная обратная связь при успешном сканировании
@@ -438,7 +416,7 @@ async function startScanner(readerId, onSuccess) {
             
             console.log('Вызываем onSuccess с кодом:', normalizedBarcode);
             
-            // Вызываем обработчик
+            // Вызываем обработчик напрямую - debounce будет в handleSale/handleReceive
             try {
                 onSuccess(normalizedBarcode);
                 console.log('✓ onSuccess вызван успешно');
